@@ -7,3 +7,4 @@ tools/_patch*.py
 tools/_patch*.js
 *.log
 .DS_Store
+tools/_*

@@ -69,9 +69,9 @@ export class ConflictProbe {
       const prev = this.active.get(k);
       if (c.level === 'LOS' && (!prev || prev.level !== 'LOS')) {
         this.w.stats.losses++;
-        this.w.log(`SEPARATION LOSS ${c.a.callsign} / ${c.b.callsign} ${c.dh.toFixed(1)} NM ${Math.round(c.dv)} ft`, 'alert', c.a);
+        this.w.log('los', { a: c.a.callsign, b: c.b.callsign, dh: c.dh.toFixed(1), dv: Math.round(c.dv) }, 'alert', c.a);
       } else if (c.level === 'STCA' && !prev) {
-        this.w.log(`STCA ${c.a.callsign} / ${c.b.callsign} in ${c.tca}s`, 'warn', c.a);
+        this.w.log('stca', { a: c.a.callsign, b: c.b.callsign, t: c.tca }, 'warn', c.a);
       }
     }
     this.active = now;

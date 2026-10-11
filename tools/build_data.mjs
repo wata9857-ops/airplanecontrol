@@ -121,10 +121,10 @@ const airports = [
   {
     icao: 'RJBB', iata: 'KIX', name: 'Kansai International', nameJa: '関西国際空港', major: true, elev: 26,
     configs: [
-      { name: 'North wind (06) — A arr / B dep', arr: ['06R'], dep: ['06L'], preferred: true, note: 'Current since 2025-03-20 (verified)' },
-      { name: 'South wind (24) — A arr / B dep', arr: ['24L'], dep: ['24R'], note: 'Current since 2025-03-20 (verified)' },
-      { name: 'Legacy 06 (2013–2025) — B arr / A dep', arr: ['06L'], dep: ['06R'], manualOnly: true },
-      { name: 'Legacy 24 (2013–2025) — B arr / A dep', arr: ['24R'], dep: ['24L'], manualOnly: true },
+      { name: 'North wind (06) — A arr / B dep', ja: '北風運用（06）— A滑走路着陸／B滑走路離陸', arr: ['06R'], dep: ['06L'], preferred: true, note: 'Current since 2025-03-20 (verified)' },
+      { name: 'South wind (24) — A arr / B dep', ja: '南風運用（24）— A滑走路着陸／B滑走路離陸', arr: ['24L'], dep: ['24R'], note: 'Current since 2025-03-20 (verified)' },
+      { name: 'Legacy 06 (2013–2025) — B arr / A dep', ja: '旧運用06（2013〜2025）— B着陸／A離陸', arr: ['06L'], dep: ['06R'], manualOnly: true },
+      { name: 'Legacy 24 (2013–2025) — B arr / A dep', ja: '旧運用24（2013〜2025）— B着陸／A離陸', arr: ['24R'], dep: ['24L'], manualOnly: true },
     ],
     defaultWind: { dir: 40, spd: 8 }, curfew: null,
     standRules: [{ airlines: ['APJ', 'JJP', 'SJO'], stands: '^(1[4-9]|[2-9]\\d)$' }],
@@ -132,33 +132,33 @@ const airports = [
   {
     icao: 'RJTT', iata: 'HND', name: 'Tokyo Haneda', nameJa: '東京国際空港（羽田）', major: true, elev: 21,
     configs: [
-      { name: 'North wind — arr 34L/34R, dep 05/34R', arr: ['34L', '34R'], dep: ['34R', '05'], preferred: true, depSplit: [{ from: 300, to: 110, rwy: '34R' }, { from: 110, to: 300, rwy: '05' }], note: 'MLIT configuration 1–4 (verified); departure split by direction is an approximation' },
-      { name: 'South wind — arr 22/23, dep 16L/16R', arr: ['22', '23'], dep: ['16R', '16L'], depSplit: [{ from: 180, to: 360, rwy: '16R' }, { from: 0, to: 180, rwy: '16L' }], note: 'MLIT configuration 5/6 (verified). Primary LDA W 22/23 not modelled — ILS 22 / ILS Z 23 used.' },
-      { name: 'South wind new routes — arr 16L/16R, dep 22/16R', arr: ['16L', '16R'], dep: ['22', '16R'], time: [15 * 3600, 19 * 3600], depSplit: [{ from: 180, to: 360, rwy: '16R' }, { from: 0, to: 180, rwy: '22' }], note: 'MLIT configuration 7/8, ~3 h within 15:00–19:00 (verified)' },
+      { name: 'North wind — arr 34L/34R, dep 05/34R', ja: '北風運用 — 着陸34L/34R、離陸05/34R', arr: ['34L', '34R'], dep: ['34R', '05'], preferred: true, depSplit: [{ from: 300, to: 110, rwy: '34R' }, { from: 110, to: 300, rwy: '05' }], note: 'MLIT configuration 1–4 (verified); departure split by direction is an approximation' },
+      { name: 'South wind — arr 22/23, dep 16L/16R', ja: '南風運用 — 着陸22/23、離陸16L/16R', arr: ['22', '23'], dep: ['16R', '16L'], depSplit: [{ from: 180, to: 360, rwy: '16R' }, { from: 0, to: 180, rwy: '16L' }], note: 'MLIT configuration 5/6 (verified). Primary LDA W 22/23 not modelled — ILS 22 / ILS Z 23 used.' },
+      { name: 'South wind new routes — arr 16L/16R, dep 22/16R', ja: '南風・新飛行経路 — 着陸16L/16R、離陸22/16R', arr: ['16L', '16R'], dep: ['22', '16R'], time: [15 * 3600, 19 * 3600], depSplit: [{ from: 180, to: 360, rwy: '16R' }, { from: 0, to: 180, rwy: '22' }], note: 'MLIT configuration 7/8, ~3 h within 15:00–19:00 (verified)' },
     ],
     defaultWind: { dir: 350, spd: 10 },
   },
   {
     icao: 'RJAA', iata: 'NRT', name: 'Narita International', nameJa: '成田国際空港', major: true, elev: 135,
     configs: [
-      { name: 'North wind — 34L/34R mixed', arr: ['34L', '34R'], dep: ['34L', '34R'], preferred: true, mixed: ['34L', '34R'], depSplit: [{ from: 180, to: 360, rwy: '34L' }, { from: 0, to: 180, rwy: '34R' }], note: 'Simultaneous parallel mixed operations (verified); per-runway split approximate' },
-      { name: 'South wind — 16R/16L mixed', arr: ['16R', '16L'], dep: ['16R', '16L'], mixed: ['16R', '16L'], depSplit: [{ from: 180, to: 360, rwy: '16R' }, { from: 0, to: 180, rwy: '16L' }] },
+      { name: 'North wind — 34L/34R mixed', ja: '北風運用 — 34L/34R 離着陸混合', arr: ['34L', '34R'], dep: ['34L', '34R'], preferred: true, mixed: ['34L', '34R'], depSplit: [{ from: 180, to: 360, rwy: '34L' }, { from: 0, to: 180, rwy: '34R' }], note: 'Simultaneous parallel mixed operations (verified); per-runway split approximate' },
+      { name: 'South wind — 16R/16L mixed', ja: '南風運用 — 16R/16L 離着陸混合', arr: ['16R', '16L'], dep: ['16R', '16L'], mixed: ['16R', '16L'], depSplit: [{ from: 180, to: 360, rwy: '16R' }, { from: 0, to: 180, rwy: '16L' }] },
     ],
     defaultWind: { dir: 350, spd: 8 }, curfew: [0, 6 * 3600],
   },
   {
     icao: 'RJOO', iata: 'ITM', name: 'Osaka Itami', nameJa: '大阪国際空港（伊丹）', major: true, elev: 39,
     configs: [
-      { name: '32 operation — ILS 32L', arr: ['32L'], dep: ['32L'], smallDep: '32R', preferred: true, mixed: ['32L'], tailwindLimit: 10, bias: 14, note: 'Normal operation (verified); ~97% of the time' },
-      { name: '14 operation (circling)', arr: ['14R'], dep: ['14R'], mixed: ['14R'], note: 'Rare (~3%); circling from ILS 32L not modelled — vectors to 14R' },
+      { name: '32 operation — ILS 32L', ja: '32運用 — ILS 32L', arr: ['32L'], dep: ['32L'], smallDep: '32R', preferred: true, mixed: ['32L'], tailwindLimit: 10, bias: 14, note: 'Normal operation (verified); ~97% of the time' },
+      { name: '14 operation (circling)', ja: '14運用（周回進入）', arr: ['14R'], dep: ['14R'], mixed: ['14R'], note: 'Rare (~3%); circling from ILS 32L not modelled — vectors to 14R' },
     ],
     defaultWind: { dir: 320, spd: 6 }, curfew: [21 * 3600, 7 * 3600],
   },
   {
     icao: 'RJBE', iata: 'UKB', name: 'Kobe', nameJa: '神戸空港', major: false, elev: 22,
     configs: [
-      { name: 'Runway 09', arr: ['09'], dep: ['09'], preferred: true, mixed: ['09'] },
-      { name: 'Runway 27', arr: ['27'], dep: ['27'], mixed: ['27'], note: 'No published RWY27 instrument approach in data — vectors' },
+      { name: 'Runway 09', ja: '滑走路09', arr: ['09'], dep: ['09'], preferred: true, mixed: ['09'] },
+      { name: 'Runway 27', ja: '滑走路27', arr: ['27'], dep: ['27'], mixed: ['27'], note: 'No published RWY27 instrument approach in data — vectors' },
     ],
     defaultWind: { dir: 90, spd: 5 }, curfew: [23 * 3600, 7 * 3600],
   },
@@ -190,16 +190,28 @@ if (exists('research/schedules_full.json')) {
     if (!f.callsign || !f.from || !f.to || !f.timeLocal) continue;
     const key = `${f.callsign}|${f.from}|${f.to}|${f.dir}`;
     if (seen.has(key)) continue; seen.add(key);
-    flights.push({ dir: f.dir, airport: f.airport, flight: f.flight, callsign: f.callsign.replace(/\s/g, ''), airline: f.airline, from: f.from, to: f.to, timeLocal: f.timeLocal, type: f.type, typeVerified: !!f.typeVerified, verified: !!f.verified });
+    const cs = f.callsign.replace(/\s/g, '');
+    const airline = /^[A-Z]{3}\d/.test(cs) ? cs.slice(0, 3) : f.airline; // callsign prefix = operating airline (fixes tracker mislabels, e.g. J-AIR → JAL)
+    flights.push({ dir: f.dir, flight: f.flight, callsign: cs, airline, from: f.from, to: f.to, timeLocal: f.timeLocal, type: f.type, reg: f.reg || '' });
   }
-  schedule = { flights, airlines: (S.airlines || []).map((a) => ({ icao: a.icao, iata: a.iata, name: a.name, telephony: a.telephony, fleet: a.fleet, verified: !!a.verified })), sources: (S.sources || []).map((s) => ({ name: s.name, url: s.url })) };
+  const airlines = new Map((S.airlines || []).map((a) => [a.icao, { icao: a.icao, iata: a.iata, name: a.name, telephony: a.telephony, cargo: false, verified: !!a.verified }]));
+  if (exists('research/airlines_extra.json')) for (const a of rd('research/airlines_extra.json').airlines || []) if (a.icao && (a.verified || !airlines.has(a.icao)) && a.telephony) airlines.set(a.icao, { icao: a.icao, iata: a.iata, name: a.name, telephony: a.telephony, cargo: !!a.cargo, verified: !!a.verified });
+  for (const a of [{ icao: 'LXJ', name: 'Flexjet', telephony: 'FLEXJET' }, { icao: 'NJE', name: 'NetJets Europe', telephony: 'FRACTION' }, { icao: 'AIQ', name: 'Thai AirAsia', telephony: 'THAI ASIA' }, { icao: 'CAO', name: 'Air China Cargo', telephony: 'AIRCHINA FREIGHT', cargo: true }, { icao: 'YZR', name: 'Yangtze River Express', telephony: 'YANGTZE RIVER', cargo: true }, { icao: 'ORC', name: 'Oriental Air Bridge', telephony: 'ORIENTAL BRIDGE' }, { icao: 'PAC', name: 'Polar Air Cargo', telephony: 'POLAR', cargo: true }, { icao: 'QDA', name: 'Qingdao Airlines', telephony: 'SKY LEGEND' }]) if (!airlines.has(a.icao)) airlines.set(a.icao, { ...a, iata: '', cargo: false, verified: false });
+  schedule = { flights, airlines: [...airlines.values()], sources: (S.sources || []).map((s) => ({ name: s.name, url: s.url })) };
   for (const f of flights) for (const k of [f.from, f.to]) if (!worldAirports[k]) console.warn('unknown airport in schedule', k);
 }
 
+let ovfAirports = {};
+if (exists('research/overflights.json')) {
+  const O = rd('research/overflights.json');
+  schedule.overflights = O.flights;
+  ovfAirports = O.airports || {};
+}
 const needed = new Set(airports.map((a) => a.icao));
 for (const f of schedule.flights) { needed.add(f.from); needed.add(f.to); }
 const wa = {}, ia = {}, nm = {};
 for (const k of needed) if (worldAirports[k]) { wa[k] = worldAirports[k]; if (iata[k]) ia[k] = iata[k]; nm[k] = apNames[k]; }
+for (const [k, v] of Object.entries(ovfAirports)) { if (!wa[k] && v.ll) wa[k] = v.ll.map((x) => +x.toFixed(4)); if (v.iata && !ia[k]) ia[k] = v.iata; if (v.name && !nm[k]) nm[k] = v.name; }
 
 fs.writeFileSync('data/world.json', JSON.stringify({
   domain: { minLat: 31.5, maxLat: 38.8, minLon: 131.0, maxLon: 143.5 },

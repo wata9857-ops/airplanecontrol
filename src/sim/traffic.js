@@ -3,15 +3,30 @@
 // arrivals from outside the simulated domain enter at the domain edge so that
 // they land close to STA. Flights between two simulated airports are flown
 // gate-to-gate.
-import { toXY, dist, bearing, project, norm360, trueToMag } from '../geo.js';
+import { toXY, dist, bearing, project, norm360, trueToMag, gcDist, gcPoint } from '../geo.js';
 import { Aircraft } from './aircraft.js';
 
-const ENTRY_NM = 170; // arrivals appear this far (track miles) from destination
+const ENTRY_MAX = 330; // arrivals enter where their great-circle route crosses the domain edge (capped)
+
+// First point (walking back from the destination toward the origin) that is
+// still inside the simulated domain = where the flight enters our airspace.
+function entryPoint(dest, orig, box) {
+  const total = gcDist(dest[0], dest[1], orig[0], orig[1]);
+  const inside = (p) => p.lat > box.minLat + 0.05 && p.lat < box.maxLat - 0.05 && p.lon > box.minLon + 0.05 && p.lon < box.maxLon - 0.05;
+  let last = { lat: dest[0], lon: dest[1] }, d = 0;
+  for (d = 10; d <= Math.min(total, ENTRY_MAX); d += 10) {
+    const p = gcPoint(dest[0], dest[1], orig[0], orig[1], d / total);
+    if (!inside(p)) break;
+    last = p;
+  }
+  return { ll: last, nm: Math.min(d, total, ENTRY_MAX) };
+}
 
 export class Traffic {
   constructor(world, data) {
     this.w = world;
     this.flights = (data.schedule?.flights || []).map((f, i) => ({ ...f, key: i, t: hhmm(f.timeLocal) }));
+    this.overflights = (data.schedule?.overflights || []).map((f, i) => ({ ...f, key: 'o' + i }));
     this.airlines = new Map((data.schedule?.airlines || []).map((a) => [a.icao, a]));
     this.spawned = new Set();
     this.density = 1.0;
@@ -23,6 +38,7 @@ export class Traffic {
 
   update() {
     const clock = this.w.clock;
+    this.updateOverflights(clock);
     if (this.pending.length) {
       const due = this.pending.filter((p) => p.at <= this.w.time);
       this.pending = this.pending.filter((p) => p.at > this.w.time);
@@ -53,7 +69,43 @@ export class Traffic {
     }
   }
 
-  inboundTime(f) { return ENTRY_NM / 330 * 3600 + 6 * 60; }
+  entryFor(f) {
+    if (f._entry) return f._entry;
+    const dest = this.w.data.worldAirports[f.to], orig = this.w.data.worldAirports[f.from];
+    const ap = this.simAirport(f.to);
+    if (!dest || !orig) { const p = project(ap, 250, 170); f._entry = { xy: p, nm: 170 }; return f._entry; }
+    const e = entryPoint(dest, orig, this.w.data.domain);
+    f._entry = { xy: toXY(e.ll.lat, e.ll.lon), nm: e.nm };
+    return f._entry;
+  }
+  inboundTime(f) { return this.entryFor(f).nm * 1.12 / 400 * 3600 + 7 * 60; }
+
+  // Overflights: real flights between airports outside the simulation whose
+  // great-circle route crosses the domain (entry/exit precomputed at build).
+  updateOverflights(clock) {
+    for (const f of this.overflights) {
+      const dayKey = `${f.key}@${Math.floor((this.w.startClock + this.w.time) / 86400)}`;
+      if (this.spawned.has(dayKey)) continue;
+      if (this.density < 1 && (parseInt(f.key.slice(1), 10) * 0.6180339) % 1 > this.density) continue;
+      const dur = f.dur || 1800;
+      if (inWindow(clock, f.tIn, 60)) { this.spawned.add(dayKey); this.spawnOverflight(f, 0); }
+      else if (this.w.time < 2 && inWindow(clock, f.tIn, dur - 120)) { this.spawned.add(dayKey); this.spawnOverflight(f, circDiff(clock, f.tIn)); }
+    }
+  }
+  spawnOverflight(f, elapsed) {
+    const pts = f.path.map(([la, lo]) => toXY(la, lo));
+    const route = pts.slice(1).map((p, i) => ({ id: i === pts.length - 2 ? 'EXIT' : '·', x: p.x, y: p.y, kind: 'ENR' }));
+    const trk = bearing(pts[0], pts.at(-1));
+    const cruise = f.alt || this.cruiseFor(f.from, f.to, trk);
+    const ac = this.makeAircraft(f, { dir: 'OVF', x: pts[0].x, y: pts[0].y, alt: cruise, clearedAlt: cruise, hdg: trk, phase: 'CRUISE' });
+    ac.cruiseAlt = cruise; ac.route = route; ac.routeIdx = 0; ac.legStart = pts[0]; ac.vnav = false; ac.endInside = !!f.endInside;
+    if (f.startInside && !elapsed) { ac.alt = Math.min(cruise, 12000); ac.ias = 280; }
+    ac.ias = ac.alt > 26000 ? 270 : ac.perf.cruiseIas;
+    if (elapsed > 0) this.advanceAlongRoute(ac, elapsed, 0);
+    ac.hdg = bearing(ac, ac.activeWp || pts.at(-1));
+    for (let k = 0; k < 3; k++) { if (!this.w.aircraft.some((o) => !o.onGround && dist(o, ac) < 10 && Math.abs(o.alt - ac.alt) < 1500)) break; ac.alt += 2000; ac.clearedAlt = ac.cruiseAlt = ac.alt; }
+    this.w.add(ac);
+  }
 
   makeAircraft(f, extra) {
     const al = this.airlines.get(f.airline) || {};
@@ -118,8 +170,8 @@ export class Traffic {
     const ap = this.simAirport(f.to);
     const orig = this.w.data.worldAirports[f.from];
     const origPt = orig ? toXY(...orig) : project(ap, 250, 600);
-    const brg = bearing(ap, origPt);
-    const entry = project(ap, brg, Math.min(ENTRY_NM, dist(ap, origPt)));
+    const entry = this.entryFor(f).xy;
+    const brg = bearing(ap, entry);
     const cruise = this.cruiseFor(f.from, f.to, norm360(brg + 180));
     const ac = this.makeAircraft(f, { dir: 'ARR', x: entry.x, y: entry.y, alt: cruise, ias: 280, hdg: norm360(brg + 180), phase: 'CRUISE', clearedAlt: cruise });
     ac.cruiseAlt = cruise;
@@ -145,9 +197,9 @@ export class Traffic {
   }
 
   // Place an aircraft `sec` seconds along its route (rough average speeds).
-  advanceAlongRoute(ac, sec) {
-    let remaining = sec * 400 / 3600; // NM
-    while (remaining > 0 && ac.routeIdx < ac.route.length - 4) {
+  advanceAlongRoute(ac, sec, keep = 4) {
+    let remaining = sec * 420 / 3600; // NM
+    while (remaining > 0 && ac.routeIdx < ac.route.length - keep) {
       const wp = ac.activeWp;
       const d = dist(ac, wp);
       if (d > remaining) {

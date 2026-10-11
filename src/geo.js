@@ -49,3 +49,34 @@ export function trackInfo(p, a, b) {
 
 export const fmtAlt = (ft) => (ft >= 14000 ? 'FL' + String(Math.round(ft / 100)).padStart(3, '0') : Math.round(ft).toLocaleString('en-US'));
 export const pad3 = (n) => String(Math.round(n)).padStart(3, '0');
+
+// Great-circle helpers (lat/lon in degrees, distances in NM)
+export function gcDist(la1, lo1, la2, lo2) {
+  const p1 = la1 * D2R, p2 = la2 * D2R, dp = p2 - p1, dl = (lo2 - lo1) * D2R;
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+export function gcPoint(la1, lo1, la2, lo2, f) {
+  const p1 = la1 * D2R, l1 = lo1 * D2R, p2 = la2 * D2R, l2 = lo2 * D2R;
+  const d = gcDist(la1, lo1, la2, lo2) / 3440.065;
+  if (d < 1e-9) return { lat: la1, lon: lo1 };
+  const A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+  const x = A * Math.cos(p1) * Math.cos(l1) + B * Math.cos(p2) * Math.cos(l2);
+  const y = A * Math.cos(p1) * Math.sin(l1) + B * Math.cos(p2) * Math.sin(l2);
+  const z = A * Math.sin(p1) + B * Math.sin(p2);
+  return { lat: Math.atan2(z, Math.hypot(x, y)) * R2D, lon: Math.atan2(y, x) * R2D };
+}
+// Where a great-circle route from A to B crosses the domain box: returns
+// { inF, outF } fractions along the route (null if it never enters).
+export function gcDomainCrossing(a, b, box, step = 15) {
+  const total = gcDist(a[0], a[1], b[0], b[1]);
+  const n = Math.max(2, Math.ceil(total / step));
+  let inF = null, outF = null;
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, p = gcPoint(a[0], a[1], b[0], b[1], f);
+    const inside = p.lat > box.minLat && p.lat < box.maxLat && p.lon > box.minLon && p.lon < box.maxLon;
+    if (inside && inF == null) inF = f;
+    if (inside) outF = f;
+  }
+  return inF == null ? null : { inF, outF, total };
+}

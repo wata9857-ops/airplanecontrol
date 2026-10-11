@@ -10,10 +10,17 @@ Kansai (KIX / ITM / UKB) and Kanto (HND / NRT), built for iPad (touch) and smart
 - **One continuous map with four levels.** Wide area (関西/関東 広域) → terminal (関西/関東) →
   approach (KIX / HND / NRT) → airport surface (KIX / HND / NRT 空港). Zoom is continuous and
   every aircraft keeps flying in every view (gate-to-gate for HND⇄ITM/KIX flights).
-- **Real traffic.** All flights operated at KIX, HND, NRT, ITM and UKB on 2026-10-11,
-  2,900+ flights, with broadcast callsigns, aircraft types and scheduled times (Flightradar24 public
-  airport boards). Departures appear on stands 20 min before STD and push back on time;
-  arrivals enter the area so that they land around STA.
+- **Real traffic.**
+  - **Airport traffic:** all 2,913 flights operated at KIX, HND, NRT, ITM and UKB on 2026-10-11,
+    from the Flightradar24 public airport boards. This covers domestic, international, low-cost,
+    cargo and business flights from 125 airlines, with broadcast callsigns and verified radio
+    telephony.
+  - **Overflights:** 653 real flights that cross the area without landing at a simulated airport,
+    for example FUK–CTS, Asia–North America and Anchorage cargo. Their routes are approximated as
+    great circles.
+  - **Timing:** departures appear on stands 20 min before STD and push back on time. Arrivals enter
+    where their great-circle route crosses the airspace boundary, so they land around STA.
+    Aircraft leaving the area are handed off rather than simply removed.
 - **Real procedures.** AIP Japan STARs, SIDs (with transitions) and ILS/RNP approach fixes and
   constraints for KIX, ITM, UKB, HND and NRT. Runway configurations follow MLIT/JCAB, e.g. KIX
   A-runway arrivals / B-runway departures since 2025-03-20, and the HND north/south-wind
@@ -36,6 +43,30 @@ Kansai (KIX / ITM / UKB) and Kanto (HND / NRT), built for iPad (touch) and smart
   of spacing on final.
 - **Abnormal situations.** Wind changes and runway configuration changes, runway closures,
   thunderstorm cells, emergencies (7700, return-to-base, priority).
+- **ATC positions.** Global mode, or work one real position. Responsibilities follow JCAB practice;
+  boundaries are approximate.
+  - **Ground:** Tokyo, Narita, Kansai, Osaka and Kobe Ground.
+  - **Tower:** the same five airports.
+  - **Approach/Departure:** Tokyo Approach (Haneda and Narita sectors) and Kansai Approach.
+  - **Area control:** Tokyo and Kobe Control (lower airspace), Fukuoka Control (upper, FL335 and above).
+  - **How it works:** aircraft hand off between units with check-ins. With manual clearances on,
+    pilots in your jurisdiction call you with requests (pushback, taxi, take-off, landing, approach,
+    climb), and you approve them from the radio panel. Everything else keeps running under automation.
+- **Radio transcript.** Live controller/pilot messages per unit. Controller and pilot lines are
+  colour-coded, history scrolls, and tapping a line selects the aircraft. Phraseology is English
+  (ICAO) or Japanese (日本語交信), independent of the UI language.
+- **UI language and themes.** Full Japanese or English interface. Dark and light map themes;
+  settings are remembered.
+- **Aircraft display modes.**
+  - **Realistic:** silhouettes showing heading.
+  - **Radar:** ARTS-style symbols and datablocks.
+  - **Simple:** minimal labels and map.
+  - **Beginner:** big icons, plain-language labels, a legend and alert explanations.
+- **Display filters.** Airport (arriving, departing, or in its airspace), traffic type, ground or
+  airborne, ATC unit, alerts only, and airline/flight/type search. Filters change only what is
+  drawn: hidden aircraft keep flying and STCA still monitors them.
+- **Collapsible panels.** Position selector, radio, filters, strips, aircraft panel and the ⤢
+  full-map button. iPad landscape and portrait, and phones (floating side toolbar).
 
 ## Data sources
 
@@ -69,6 +100,8 @@ Data pipeline (research JSON → runtime data):
 node tools/build_geo.mjs        # Natural Earth → data/geo_land.json
 node tools/build_layouts.mjs    # OSM Overpass extracts → data/layout_*.json
 node tools/build_schedule.mjs   # FR24 boards → research/schedules_full.json
+node tools/fetch_ovf_boards.mjs # boards of 31 other airports (overflight candidates)
+node tools/build_ovf.mjs        # → research/overflights.json
 node tools/build_data.mjs       # navdata + ops + schedule → data/nav.json, data/world.json
 ```
 

@@ -15,6 +15,7 @@
 <body>
 <div id="app">
   <header id="topbar">
+    <button id="btnPos" class="tb pos"></button>
     <div class="grp" id="areaBtns"></div>
     <button id="btnView" class="tb">VIEW ▾</button>
     <div class="grp grow" id="clockGrp">
@@ -22,22 +23,31 @@
       <button id="btnPause" class="tb">❚❚</button>
       <button id="btnSpeed" class="tb">×1</button>
     </div>
-    <div class="grp">
+    <div class="grp" id="topTools">
       <button id="btnAlerts" class="tb">⚠ <span id="alertCount">0</span></button>
-      <button id="btnLists" class="tb">STRIPS</button>
+      <button id="btnFilter" class="tb"></button>
+      <button id="btnComms" class="tb"></button>
+      <button id="btnLists" class="tb"></button>
+      <button id="btnFull" class="tb"></button>
       <button id="btnMenu" class="tb">☰</button>
     </div>
   </header>
   <main id="stage">
     <canvas id="radar"></canvas>
+    <div id="ticker" class="hidden"></div>
+    <div id="filterBadge" class="hidden"></div>
     <div id="levelBadge"></div>
+    <div id="legend" class="hidden"></div>
+    <div id="sideTools" class="hidden"></div>
     <div id="zoomCtl"><button id="zIn">＋</button><button id="zOut">－</button></div>
     <div id="toast"></div>
   </main>
   <aside id="panel" class="hidden"></aside>
-  <aside id="lists" class="hidden"></aside>
+  <aside id="drawer" class="hidden"></aside>
+  <aside id="comms" class="hidden"></aside>
   <div id="menu" class="hidden"></div>
   <div id="viewMenu" class="hidden"></div>
+  <div id="tutorial" class="hidden"></div>
   <div id="loading">Loading navigation data…</div>
 </div>
 <script type="module" src="src/main.js"></script>

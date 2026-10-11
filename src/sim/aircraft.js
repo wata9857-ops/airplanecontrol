@@ -283,7 +283,8 @@ export class Aircraft {
   onWaypointPassed(wp, world) {
     if (wp.hold && this.holdRequest && !this.hold) {
       this.holdRequest = false;
-      world?.log(`${this.callsign} hold at ${wp.id}, expect further clearance (delay ${Math.round((this.delay || 0) / 60)} min)`, 'warn', this);
+      world?.log('hold', { cs: this.callsign, fix: wp.id, min: Math.round((this.delay || 0) / 60) }, 'warn', this);
+      world?.radio.exchange(this, this.unit, 'hold', { fix: wp.id, min: Math.max(5, Math.round((this.delay || 0) / 60)) });
       this.startHold(wp, wp.hold.inbound, wp.hold.turn || 1);
     }
     if (world && world.onWaypoint) world.onWaypoint(this, wp);

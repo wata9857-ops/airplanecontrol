@@ -13,7 +13,7 @@ const TYPE_MAP = {
   '73F': 'B738', '320': 'A320', '737': 'B737', '74F': 'B744', '76F': 'B763', '32Q': 'A21N', CR7: 'CRJ7', '321': 'A321', E90: 'E190',
   '32N': 'A20N', '77X': 'B77L', E70: 'E170', '738': 'B738', '763': 'B763', '772': 'B772', '789': 'B789', '787': 'B788', '788': 'B788',
   '73H': 'B738', '74Y': 'B744', '74N': 'B748', '330': 'A333', '333': 'A333', '359': 'A359', '773': 'B773', '76Y': 'B763', DH4: 'DH8D',
-  B741: 'B744', '77W': 'B77W', '32B': 'A321', '788F': 'B788',
+  B741: 'B744', '77W': 'B77W', '32B': 'A321', '788F': 'B788', '77F': 'B77L',
 };
 
 function rowsFromRaw(code) {
@@ -46,11 +46,13 @@ for (const [code, icao] of Object.entries(ap)) {
     const [oIcao, oIata] = (r.other || '').split('/');
     if (!oIcao || oIcao === 'null' || oIcao === 'undefined') continue;
     let type = r.type ? (TYPE_MAP[r.type] || r.type) : null;
-    if (!type || ['GLF6', 'GLEX', 'C68A', 'C25B'].includes(type)) continue; // skip business jets / unknown types
+    if (!type) continue; // unknown type
     const num = (r.flight || '').replace(/^[A-Z0-9]{2}/, '');
     let cs = r.cs;
     let derived = false;
-    if (!cs) { if (!r.al) continue; cs = r.al + num; derived = true; }
+    // tracker airline-code mislabels (research/airlines_extra.json): J-AIR→JAL, AIRDO→ADO, Cargolux Italia→ICV
+    const ALIAS = { JTL: 'JAL', HYA: 'ADO', CRA: 'ICV' };
+    if (!cs) { if (!r.al) continue; cs = (ALIAS[r.al] || r.al) + num; derived = true; }
     const from = r.dir === 'DEP' ? icao : oIcao, to = r.dir === 'DEP' ? oIcao : icao;
     const key = `${cs}|${from}|${to}`;
     if (seen.has(key)) continue; // HND–ITM etc. appear on both boards

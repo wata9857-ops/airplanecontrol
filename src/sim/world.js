@@ -6,6 +6,9 @@ import { perf, WAKE_NM, tasFromIas } from './performance.js';
 import { Automation } from './automation.js';
 import { ConflictProbe } from './conflict.js';
 import { Traffic } from './traffic.js';
+import { Radio } from './radio.js';
+import { unitOf } from './positions.js';
+import { fmtEvent } from '../i18n.js';
 
 export const SIM_DT = 0.5; // seconds per physics step
 
@@ -26,13 +29,18 @@ export class World {
     this.conflicts = new ConflictProbe(this);
     this.traffic = new Traffic(this, data);
     this.listeners = [];
+    this.radio = new Radio(this);
+    this.userPos = null;   // selected ATC position (null = global)
+    this.manualClr = false; // user issues routine clearances for that position
   }
 
   get clock() { return (this.startClock + this.time) % 86400; }
   clockStr(sec = this.clock) { const h = Math.floor(sec / 3600) % 24, m = Math.floor(sec / 60) % 60, s = Math.floor(sec % 60); return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; }
 
-  log(msg, kind = 'info', ac = null) {
-    this.events.push({ t: this.clock, msg, kind, ac: ac?.id });
+  // Event log. Messages are stored as (key, params) and rendered in the UI
+  // language; `msg` keeps an English rendering for tools/tests.
+  log(k, p = {}, kind = 'info', ac = null) {
+    this.events.push({ t: this.clock, k, p, msg: fmtEvent('en', k, p), kind, ac: ac?.id });
     if (this.events.length > 300) this.events.shift();
   }
 
@@ -91,7 +99,7 @@ export class World {
     });
     if (best !== ap.configIdx) {
       ap.configIdx = best;
-      if (!initial) { this.log(`${ap.iata}: runway configuration changed to ${ap.configs[best].name}`, 'warn'); this.automation.onConfigChange(ap); }
+      if (!initial) { this.log('cfgChanged', { ap: ap.iata, cfg: ap.configs[best].name, cfgJa: ap.configs[best].ja || ap.configs[best].name }, 'warn'); this.automation.onConfigChange(ap); }
     }
   }
 
@@ -118,6 +126,7 @@ export class World {
     }
     this.automation.update(dt);
     this.conflicts.update(dt);
+    if (Math.floor(this.time) !== Math.floor(this.time - dt)) this.updateUnits();
     if (Math.floor(this.time / 60) !== Math.floor((this.time - dt) / 60)) for (const ap of this.airports.values()) this.autoSelectConfig(ap);
     this.cleanup();
   }
@@ -126,10 +135,13 @@ export class World {
     const B = this.data.domain;
     this.aircraft = this.aircraft.filter((ac) => {
       if (ac.remove) return false;
+      if (ac.dir === 'OVF' && ac.endInside && !ac.activeWp) { this.log('handedOver', { cs: ac.callsign, to: this.data.iata[ac.to] || ac.to }, 'info', ac); return false; }
       if (!ac.onGround && ac.dir !== 'ARR') {
         const ll = ac.latlon;
         if (ll.lat < B.minLat || ll.lat > B.maxLat || ll.lon < B.minLon || ll.lon > B.maxLon) {
-          this.log(`${ac.callsign} left the simulation area`, 'info', ac);
+          // hand off to the adjacent sector / Fukuoka FIR oceanic before leaving the simulated area
+          if (ac.unit && ac.unit !== 'FUKUOKA_ACC') this.radio.exchange(ac, ac.unit, 'contact', { u2: 'FUKUOKA_ACC' });
+          this.log('leftArea', { cs: ac.callsign }, 'info', ac);
           return false;
         }
       }
@@ -179,7 +191,7 @@ export class World {
         break;
       }
       case 'STARTUP':
-        if (this.time - ac.phaseT > 45) this.automation.beginTaxiOut(ac);
+        if (this.time - ac.phaseT > 45 && !ac.req) this.automation.startupDone(ac);
         break;
       case 'TAXI_OUT':
         if (followPolyline(ac, dt, this)) {
@@ -192,7 +204,7 @@ export class World {
       case 'LINEUP':
         if (followPolyline(ac, dt, this)) {
           ac.hdg = ac.depRwy.trueHdg; ac.gsGround = 0;
-          if (ac.takeoffCleared) { ac.phase = 'TAKEOFF'; this.log(`${ac.callsign} rolling RWY ${ac.depRwy.id}`, 'info', ac); }
+          if (ac.takeoffCleared) { ac.phase = 'TAKEOFF'; this.log('rolling', { cs: ac.callsign, rwy: ac.depRwy.id }, 'info', ac); }
           else ac.phase = 'LINED_UP';
         }
         break;
@@ -225,13 +237,46 @@ export class World {
       case 'TAXI_IN':
         if (followPolyline(ac, dt, this)) {
           ac.phase = 'PARKED'; ac.gsGround = 0; ac.gs = 0; ac.parkedAt = this.time;
-          this.log(`${ac.callsign} on stand ${ac.stand?.ref ?? ''}`, 'info', ac);
+          this.log('onStand', { cs: ac.callsign, spot: ac.stand?.ref ?? '' }, 'info', ac);
         }
         break;
     }
     if (ac.phase === 'PARKED' && ac.dir === 'ARR' && this.time - ac.parkedAt > 600) {
       if (ac.stand) ac.stand.occupied = null;
       ac.remove = true;
+    }
+  }
+
+  // ---------------- ATC units / handoffs ----------------
+  isUser(ac, unit = unitOf(this, ac)) { return !!this.userPos && this.manualClr && unit === this.userPos; }
+  updateUnits() {
+    for (const ac of this.aircraft) {
+      const u = unitOf(this, ac);
+      if (u === ac.unit) { ac.unitPend = null; continue; }
+      if (ac.unit == null || u == null) { ac.unit = u; ac.unitPend = null; continue; }
+      // small hysteresis so boundary wobbles do not cause repeated handoffs
+      if (ac.unitPend !== u) { ac.unitPend = u; ac.unitPendT = this.time; continue; }
+      if (this.time - ac.unitPendT < 3) continue;
+      this.handoff(ac, ac.unit, u);
+    }
+  }
+  handoff(ac, from, to) {
+    const R = this.radio;
+    ac.unit = to; ac.unitPend = null;
+    R.exchange(ac, from, 'contact', { u2: to });
+    const type = to.split('_').pop();
+    const user = this.isUser(ac, to);
+    if (type === 'APP' || type === 'ACC') {
+      if (ac.dir === 'DEP') { R.say(ac, to, 'PLT', 'dep_checkin', { alt: Math.round(ac.alt / 100) * 100, clr: ac.clearedAlt }); R.say(ac, to, 'ATC', type === 'APP' ? 'radar_dep' : 'radar_enr', { clr: ac.clearedAlt }); }
+      else if (ac.dir === 'ARR' && type === 'APP') { R.say(ac, to, 'PLT', 'arr_checkin', { alt: Math.round(ac.alt / 100) * 100, star: (ac.starName || 'STAR').replace(' ARRIVAL', '') }); R.say(ac, to, 'ATC', 'arr_ack', { app: ac.appName || 'ILS' }); }
+      else { R.say(ac, to, 'PLT', 'enr_checkin', { alt: Math.round(ac.alt / 100) * 100 }); R.say(ac, to, 'ATC', 'radar_enr', {}); }
+    } else if (type === 'TWR') {
+      if (ac.onGround && ac.dir === 'DEP') { R.say(ac, to, 'PLT', 'ready', { rwy: ac.depRwy?.id }); if (user) ac.req = { type: 'DEPART', t: this.time }; }
+      else if (ac.dir === 'ARR') { R.say(ac, to, 'PLT', 'twr_checkin', { app: ac.appName || 'ILS' }); if (!user) R.say(ac, to, 'ATC', 'cont_app', { rwy: ac.arrRwy?.id }); else ac.req = { type: 'LAND', t: this.time }; }
+    } else if (type === 'GND' && ac.dir === 'ARR') {
+      R.say(ac, to, 'PLT', 'vacated', { rwy: ac.arrRwy?.id, spot: ac.stand?.ref || '' });
+      if (user) { if (ac.taxi) ac.taxi.hold = true; ac.req = { type: 'TAXIIN', t: this.time }; }
+      else R.exchange(ac, to, 'taxi_in', { spot: ac.stand?.ref || '', via: (ac.taxiNames || []).slice(0, 4).join(' ') });
     }
   }
 

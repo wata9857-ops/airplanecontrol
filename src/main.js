@@ -6,7 +6,7 @@ import { Renderer } from './ui/renderer.js';
 import { UI } from './ui/ui.js';
 
 const DATA_FILES = ['world', 'nav', 'geo_land', 'layout_RJBB', 'layout_RJTT', 'layout_RJAA', 'layout_RJOO', 'layout_RJBE'];
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 async function load() {
   const el = document.getElementById('loading');

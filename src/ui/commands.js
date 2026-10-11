@@ -1,76 +1,63 @@
 // ATC instructions issued by the user. Each command marks the relevant
-// dimension as manually controlled (automation then leaves it alone), logs
-// standard ICAO/JCAB phraseology and shows the pilot readback.
-import { fmtAlt, pad3, dist, bearing, project, trueToMag } from '../geo.js';
-import { radioName } from './ui.js';
+// dimension as manually controlled (automation then leaves it alone), is
+// transmitted on the controlling unit's frequency (radio transcript) and the
+// pilot reads back. Pending pilot requests are cleared by the matching command.
+import { pad3, dist, bearing, project } from '../geo.js';
+import { unitOf, posName, posFreq } from '../sim/positions.js';
+import { windStr } from '../sim/automation.js';
+import { t, getLang } from '../i18n.js';
 
 export function commands(w, ui) {
-  const data = w.data;
-  const say = (ac, atc, rb) => {
-    const rn = radioName(ac, data);
-    w.log(`→ ${rn}, ${atc}`, 'info', ac);
-    ui.toast(`${rn}, ${atc}\n«${rb}, ${rn}»`);
+  const R = w.radio;
+  const unit = (ac) => unitOf(w, ac) || ac.unit || (ac.airportIcao ? ac.airportIcao + '_GND' : null);
+  const send = (ac, key, p = {}) => {
+    const u = unit(ac);
+    const before = R.log.length;
+    R.exchange(ac, u, key, p);
+    const msgs = R.log.slice(before);
+    if (msgs.length) ui.toast(msgs.map((m, i) => (i ? '« ' : '') + R.render(m, ui.radioLang, w.data) + (i ? ' »' : '')).join('\n'));
+    ui.flash(ac);
   };
-  const altWords = (ft) => (ft >= 14000 ? `flight level ${Math.round(ft / 100)}` : `${ft.toLocaleString('en-US')} feet`);
-
-  const freq = (icao, re) => (w.airport(icao)?.frequencies || []).find((f) => re.test(f.unit));
 
   return {
     unitFor(ac) {
-      const ap = w.airport(ac.onGround ? ac.airportIcao : ac.dir === 'DEP' ? ac.from : ac.to);
-      if (ac.onGround && ap) {
-        if (['LINEUP', 'LINED_UP', 'TAKEOFF', 'ROLLOUT'].includes(ac.phase)) { const f = freq(ap.icao, /Tower/); return { name: f ? f.unit.replace(/\s*\(.*\)/, '') : `${ap.iata} TWR`, freq: f?.freq }; }
-        const f = freq(ap.icao, /Ground/); return { name: f ? f.unit.replace(/\s*\(.*\)/, '') : `${ap.iata} GND`, freq: f?.freq };
-      }
-      const near = (icao, r) => { const a = w.airport(icao); return a && dist(ac, a) < r; };
-      if (ap && dist(ac, ap) < 8 && ac.alt - ap.elev < 2500) { const f = freq(ap.icao, /Tower/); return { name: f ? f.unit.replace(/\s*\(.*\)/, '') : 'Tower', freq: f?.freq }; }
-      if (ac.alt < 16000 && (near('RJBB', 50) || near('RJOO', 35))) {
-        return ac.dir === 'DEP' ? { name: 'Kansai Departure', freq: '119.20' } : { name: 'Kansai Approach', freq: '120.25' };
-      }
-      if (ac.alt < 16000 && (near('RJTT', 50) || near('RJAA', 45))) {
-        const nrt = near('RJAA', 30) && (ac.to === 'RJAA' || ac.from === 'RJAA');
-        return ac.dir === 'DEP' ? { name: 'Tokyo Departure', freq: nrt ? '124.20' : '126.00' } : { name: 'Tokyo Approach', freq: nrt ? '124.40' : '119.10' };
-      }
-      if (ac.alt > 33500) return { name: 'Fukuoka Control', freq: '' };
-      const ll = ac.latlon;
-      return ll.lon < 136.6 && ll.lat > 33.9 ? { name: 'Kobe Control', freq: '123.90' } : { name: 'Tokyo Control', freq: '' };
+      const u = unit(ac);
+      return { id: u, name: posName(u, getLang(), ac.dir), freq: posFreq(u, ac.dir) };
     },
 
     heading(ac, mag, turn) {
       mag = Math.round(mag) % 360 || 360;
       ac.cmdHeading(mag, turn, w);
       ac.manual.hdg = true; ac.noAutoApproach = false; ac.autoClearOnVector = false;
-      const t = turn < 0 ? 'turn left heading' : turn > 0 ? 'turn right heading' : 'fly heading';
-      say(ac, `${t} ${pad3(mag)}`, `${turn < 0 ? 'Left ' : turn > 0 ? 'Right ' : ''}heading ${pad3(mag)}`);
+      send(ac, 'hdg', { hdg: pad3(mag), turn: turn < 0 ? 'left' : turn > 0 ? 'right' : '' });
     },
     orbit(ac, dir) {
       ac.startOrbit(dir);
       ac.manual.hdg = true;
-      say(ac, `make a ${dir < 0 ? 'left' : 'right'} three-sixty`, `${dir < 0 ? 'Left' : 'Right'} three-sixty`);
+      send(ac, 'orbit', { dir: dir < 0 ? 'left' : 'right' });
     },
     altitude(ac, ft) {
       const climb = ft > ac.alt;
       ac.cmdAltitude(ft); ac.manual.alt = true;
-      say(ac, `${climb ? 'climb' : 'descend'} and maintain ${altWords(ft)}`, `${climb ? 'Climb' : 'Descend'} and maintain ${altWords(ft)}`);
+      if (ac.req?.type === 'CLIMB') ac.req = null;
+      send(ac, climb ? 'climb' : 'descend', { alt: ft });
     },
     via(ac) {
       ac.manual.alt = false; ac.vnav = ac.dir === 'ARR';
-      if (ac.dir === 'ARR') { ac.clearedAlt = Math.max((ac.arrRwy?.elev || 0) + 3000, 3000); say(ac, `descend via ${ac.starName || 'STAR'}`, 'Descend via STAR'); }
-      else { ac.clearedAlt = ac.cruiseAlt; say(ac, `climb via SID, maintain ${altWords(ac.cruiseAlt)}`, `Climb via SID ${altWords(ac.cruiseAlt)}`); }
+      if (ac.dir === 'ARR') { ac.clearedAlt = Math.max((ac.arrRwy?.elev || 0) + 3000, 3000); send(ac, 'via_star', { star: (ac.starName || 'STAR').replace(' ARRIVAL', '') }); }
+      else { ac.clearedAlt = ac.cruiseAlt; if (ac.req?.type === 'CLIMB') ac.req = null; send(ac, 'via_sid', { alt: ac.cruiseAlt }); }
     },
+    climbApprove(ac) { const a = ac.req?.alt || ac.cruiseAlt; ac.req = null; ac.clearedAlt = a; send(ac, 'climb', { alt: a }); },
     speed(ac, kt) {
-      if (kt == null) { ac.atcSpd = null; ac.manual.spd = false; say(ac, 'resume normal speed', 'Resume normal speed'); return; }
+      if (kt == null) { ac.atcSpd = null; ac.manual.spd = false; send(ac, 'spd_resume'); return; }
       ac.atcSpd = kt; ac.manual.spd = true;
-      say(ac, `maintain ${kt} knots`, `Maintain ${kt} knots`);
+      send(ac, 'spd', { spd: kt });
     },
     resumeNav(ac) {
       ac.cmdResumeNav(); ac.manual.hdg = false;
-      const wp = ac.activeWp;
-      say(ac, `resume own navigation${wp ? ', direct ' + wp.id : ''}`, 'Resume own navigation');
+      send(ac, 'resume_nav', { fix: ac.activeWp && ac.activeWp.kind !== 'VEC' ? ac.activeWp.id : '' });
     },
-    direct(ac, id) {
-      if (ac.directTo(id)) { ac.manual.hdg = false; say(ac, `proceed direct ${id}`, `Direct ${id}`); }
-    },
+    direct(ac, id) { if (ac.directTo(id)) { ac.manual.hdg = false; send(ac, 'direct', { fix: id }); } },
     hold(ac, id) {
       const f = w.fix(id); if (!f) return;
       const i = ac.route.findIndex((x, k) => k >= ac.routeIdx && x.id === id);
@@ -78,12 +65,9 @@ export function commands(w, ui) {
       ac.directTo(id);
       ac.startHold(f, inbound, 1);
       ac.manual.hdg = true;
-      const ll = ac.latlon;
-      say(ac, `hold at ${id}, inbound course ${pad3(trueToMag(inbound, ll.lat, ll.lon))}, right turns, expect further clearance in 10 minutes`, `Hold at ${id}`);
+      send(ac, 'hold', { fix: id, min: 10 });
     },
-    exitHold(ac) {
-      if (ac.hold) { ac.hold.exit = true; ac.manual.hdg = false; say(ac, 'cleared to leave the hold, resume own navigation', 'Leaving the hold'); }
-    },
+    exitHold(ac) { if (ac.hold) { ac.hold.exit = true; ac.manual.hdg = false; send(ac, 'exit_hold'); } },
     reroute(ac, starName) {
       const ap = w.airport(ac.to); const s = w.procedures[ac.to].stars.find((x) => x.name === starName);
       if (!s) return;
@@ -95,47 +79,57 @@ export function commands(w, ui) {
       if (tail.length && dist(tail.at(-1), ac.arrRwy.thr) < 6.5) fw.shift();
       ac.route = [...wps, ...tail, ...fw]; ac.routeIdx = 0; ac.legStart = ac.pos; ac.starName = s.name; ac.appName = app?.a.name || ac.appName;
       ac.lat = { mode: 'LNAV', hdg: null, turn: 0 }; ac.manual.hdg = false; ac.seqFrozen = false;
-      say(ac, `cleared ${s.name.toLowerCase()}`, s.name);
+      send(ac, 'reroute', { star: s.name.replace(' ARRIVAL', ' arrival') });
     },
     runway(ac, id) {
       const ap = w.airport(ac.to); const r = ap.runways.get(id);
-      if (!r || r.closed) { ui.toast('Runway not available'); return; }
+      if (!r || r.closed) { ui.toast(t('rwyNA')); return; }
       const keepHdg = ac.manual.hdg;
       ac.seqFrozen = false;
       const seg = w.automation.buildArrivalSegment(ap, r, ac.pos);
-      ac.arrRwy = r; ac.starName = seg.starName; ac.appName = seg.appName; ac.route = seg.wps; ac.routeIdx = 0; ac.legStart = ac.pos; ac.appr = null;
+      ac.arrRwy = r; ac.starName = seg.starName; ac.appName = seg.appName; ac.route = seg.wps; ac.routeIdx = 0; ac.legStart = ac.pos; ac.appr = null; ac.landClr = false;
       if (!keepHdg) ac.lat = { mode: 'LNAV', hdg: null, turn: 0 };
-      say(ac, `expect ${seg.appName} runway ${id}`, `Expect runway ${id}`);
+      send(ac, 'expect_rwy', { app: seg.appName });
     },
     approach(ac) {
       if (!ac.arrRwy) return;
       ac.clearApproach(ac.arrRwy);
-      ac.phase = 'APPROACH';
+      ac.phase = 'APPROACH'; ac.noAutoApproach = false;
+      if (ac.req?.type === 'APP') ac.req = null;
       if (!ac.manual.alt) ac.vnav = true;
-      say(ac, `cleared ${ac.appName || 'ILS runway ' + ac.arrRwy.id} approach`, `Cleared ${ac.appName || 'ILS'} approach`);
+      send(ac, 'app_clr', { app: ac.appName || 'ILS RWY' + ac.arrRwy.id });
     },
     cancelApproach(ac) {
       ac.appr = null; ac.noAutoApproach = true;
       if (ac.lat.mode === 'LOC') ac.lat = { mode: 'HDG', hdg: ac.hdg, turn: 0 };
-      say(ac, 'cancel approach clearance, maintain present heading', 'Approach clearance cancelled');
+      send(ac, 'cancel_app');
+    },
+    clearLand(ac) {
+      if (!ac.arrRwy) return;
+      ac.landClr = true; if (ac.req?.type === 'LAND') ac.req = null;
+      send(ac, 'land_clr', { rwy: ac.arrRwy.id, wind: windStr(w, ac.arrRwy.airport) });
     },
     goAround(ac) {
       if (!ac.arrRwy) return;
+      send(ac, 'go_around', { alt: ac.arrRwy.missedAlt || 3000 });
       w.automation.goAround(ac, 'ATC instruction');
-      say(ac, `go around, climb and maintain ${altWords(ac.arrRwy.missedAlt || 3000)}, fly runway heading`, 'Going around');
     },
-    expedite(ac) { ac.expedite = true; ac.manual.spd = false; ac.atcSpd = null; say(ac, 'expedite descent, no speed restriction', 'Expedite'); },
+    expedite(ac) { ac.expedite = true; ac.manual.spd = false; ac.atcSpd = null; send(ac, 'expedite'); },
     emergency(ac) {
-      if (ac.emergency) { ac.emergency = null; ac.squawk = ac.prevSquawk || ac.squawk; w.log(`${ac.callsign} emergency cancelled`, 'info', ac); return; }
+      const u = unit(ac);
+      if (ac.emergency) { ac.emergency = null; ac.squawk = ac.prevSquawk || ac.squawk; w.log('emergencyOff', { cs: ac.callsign }, 'info', ac); return; }
       ac.emergency = 'MAYDAY'; ac.prevSquawk = ac.squawk; ac.squawk = '7700';
-      w.log(`MAYDAY ${ac.callsign} — ${ac.dir === 'DEP' ? 'engine failure, requesting return' : 'medical emergency, requesting priority'}`, 'alert', ac);
+      const nature = ac.dir === 'DEP' ? 'engine failure, requesting return' : 'medical emergency, requesting priority';
+      w.log('emergency', { cs: ac.callsign, nature }, 'alert', ac);
+      R.say(ac, u, 'PLT', 'mayday', { nature, natureJa: ac.dir === 'DEP' ? 'エンジン故障、引き返しを要求' : '急病人発生、優先着陸を要求' });
+      R.say(ac, u, 'ATC', 'mayday_ack', {});
       if (ac.dir === 'DEP' && !ac.onGround && w.airport(ac.from)) {
         ac.to = ac.from; ac.dir = 'ARR'; ac.arrJoinIdx = null;
         w.automation.planArrival(ac, ac.pos);
         ac.clearedAlt = Math.min(ac.alt, 8000); ac.cruiseAlt = ac.clearedAlt;
       }
       ac.priority = true; ac.seqFrozen = false;
-      ui.toast(`MAYDAY MAYDAY MAYDAY ${radioName(ac, data)}`, 4000);
+      ui.toast(`MAYDAY MAYDAY MAYDAY — ${ac.callsign}`, 4000); ui.flash(ac);
     },
     randomEmergency() {
       const cands = w.aircraft.filter((a) => !a.onGround && !a.emergency && a.alt > 6000 && (w.airport(a.to) || w.airport(a.from)));
@@ -146,30 +140,48 @@ export function commands(w, ui) {
     toggleRunway(ap, r) {
       const opp = ap.runways.get(r.opp);
       r.closed = !r.closed; if (opp) opp.closed = r.closed;
-      w.log(`${ap.iata} RWY ${r.id}/${r.opp} ${r.closed ? 'CLOSED' : 'reopened'}`, r.closed ? 'alert' : 'warn');
+      w.log(r.closed ? 'rwyClosed' : 'rwyOpen', { ap: ap.iata, rwy: `${r.id}/${r.opp}` }, r.closed ? 'alert' : 'warn');
       const locked = ap.configLocked; ap.configLocked = false;
       w.autoSelectConfig(ap);
       ap.configLocked = locked && !w.config(ap).arr.some((id) => ap.runways.get(id).closed);
       w.automation.onConfigChange(ap);
     },
     // ---------- ground ----------
-    push(ac) { if (ac.phase === 'PARKED') { ac.pushHold = false; w.automation.beginPushback(ac); say(ac, 'pushback and start-up approved', 'Pushback approved'); } },
-    pushHold(ac) { ac.pushHold = !ac.pushHold; say(ac, ac.pushHold ? 'standby for pushback, expect delay' : 'pushback at your discretion', ac.pushHold ? 'Standing by' : 'Roger'); },
-    holdPos(ac) { if (ac.taxi) { ac.taxi.hold = !ac.taxi.hold; say(ac, ac.taxi.hold ? 'hold position' : 'continue taxi', ac.taxi.hold ? 'Holding position' : 'Continue taxi'); } },
-    holdShort(ac) { ac.manualHold = !ac.manualHold; say(ac, ac.manualHold ? `hold short runway ${ac.depRwy.id}` : 'expect departure shortly', ac.manualHold ? `Holding short ${ac.depRwy.id}` : 'Roger'); },
+    push(ac) { if (ac.phase === 'PARKED') { ac.pushHold = false; send(ac, 'push_ok'); w.automation.beginPushback(ac, true); } },
+    pushHold(ac) { ac.pushHold = !ac.pushHold; if (ac.pushHold) { if (ac.req?.type === 'PUSH') ac.req = null; send(ac, 'push_wait'); } },
+    taxi(ac) {
+      if (ac.phase !== 'STARTUP') return;
+      const before = R.log.length;
+      w.automation.beginTaxiOut(ac);
+      const msgs = R.log.slice(before);
+      if (msgs.length) ui.toast(msgs.map((m) => R.render(m, ui.radioLang, w.data)).join('\n'));
+      ui.flash(ac);
+    },
+    taxiIn(ac) {
+      if (ac.taxi) ac.taxi.hold = false;
+      if (ac.req?.type === 'TAXIIN') ac.req = null;
+      send(ac, 'taxi_in', { spot: ac.stand?.ref || '', via: (ac.taxiNames || []).slice(0, 4).join(' ') });
+    },
+    holdPos(ac) { if (ac.taxi) { ac.taxi.hold = !ac.taxi.hold; send(ac, ac.taxi.hold ? 'hold_pos' : 'cont_taxi'); } },
+    holdShort(ac) { ac.manualHold = !ac.manualHold; if (ac.manualHold) send(ac, 'hold_short', { rwy: ac.depRwy.id }); },
+    lineUp(ac) {
+      const ap = ac.depRwy.airport, r = ac.depRwy;
+      if (r.closed) { ui.toast(t('rwyClosedT')); return; }
+      if (ac.phase !== 'HOLD_SHORT') return;
+      ap.depQueue = ap.depQueue.filter((a) => a !== ac);
+      lineupPath(ac, ap, r);
+      ac.takeoffCleared = false; ac.manualHold = true;
+      if (ac.req?.type === 'DEPART') ac.req = null;
+      send(ac, 'luaw', { rwy: r.id });
+    },
     takeoff(ac) {
       const ap = ac.depRwy.airport, r = ac.depRwy;
-      if (r.closed) { ui.toast('Runway closed'); return; }
+      if (r.closed) { ui.toast(t('rwyClosedT')); return; }
       ap.depQueue = ap.depQueue.filter((a) => a !== ac);
-      if (ac.phase === 'HOLD_SHORT') {
-        const g = ap.ground; const { entry } = g.holdingVertex(r);
-        const pts = [ac.pos, g.v[entry]]; if (dist(g.v[entry], r.start) > 0.03) pts.push(r.start);
-        pts.push(project(r.start, r.trueHdg, 0.02));
-        ac.taxi = { pts, i: 0, reverse: false, maxSpd: 12 }; ac.phase = 'LINEUP';
-      }
-      ac.takeoffCleared = true; r.occupiedBy = ac; ac.manualHold = false;
-      w.log(`${ac.callsign} RWY ${r.id} cleared for take-off (manual)`, 'info', ac);
-      say(ac, `runway ${r.id}, wind ${pad3(w.wind[ap.icao].dir)} at ${w.wind[ap.icao].spd}, cleared for take-off`, `Cleared for take-off runway ${r.id}`);
+      if (ac.phase === 'HOLD_SHORT') lineupPath(ac, ap, r);
+      ac.takeoffCleared = true; r.occupiedBy = ac; ac.manualHold = false; ac.req = null;
+      w.log('toClr', { cs: ac.callsign, rwy: r.id }, 'info', ac);
+      send(ac, 'to_clr', { rwy: r.id, wind: windStr(w, ap) });
     },
     depRunway(ac, id) {
       const ap = w.airport(ac.from); const r = ap.runways.get(id);
@@ -178,14 +190,32 @@ export function commands(w, ui) {
       const cfg = w.config(ap); const save = cfg.dep; cfg.dep = [id];
       w.automation.planDeparture(ac);
       cfg.dep = save;
-      if (['TAXI_OUT', 'HOLD_SHORT'].includes(ac.phase)) w.automation.beginTaxiOut(ac);
-      say(ac, `runway ${id}, ${ac.sidName}`, `Runway ${id}`);
+      if (['TAXI_OUT', 'HOLD_SHORT'].includes(ac.phase)) w.automation.beginTaxiOut(ac, true);
+      send(ac, 'dep_rwy', { rwy: id, sid: ac.sidName });
+    },
+    // act on a pending pilot request (radio panel buttons)
+    approveRequest(ac) {
+      const k = ac.req?.type;
+      if (k === 'PUSH') this.push(ac);
+      else if (k === 'TAXI') this.taxi(ac);
+      else if (k === 'DEPART') this.takeoff(ac);
+      else if (k === 'LAND') this.clearLand(ac);
+      else if (k === 'APP') this.approach(ac);
+      else if (k === 'CLIMB') this.climbApprove(ac);
+      else if (k === 'TAXIIN') this.taxiIn(ac);
     },
     auto(ac) {
       ac.manual = { hdg: false, alt: false, spd: false }; ac.atcSpd = null; ac.noAutoApproach = false; ac.manualHold = false; ac.pushHold = false;
-      if (ac.dir === 'ARR' && !ac.onGround && !(ac.appr && ac.appr.established)) w.automation.planArrival(ac, ac.pos);
-      if (ac.dir === 'DEP' && !ac.onGround) { ac.lat = { mode: 'LNAV', hdg: null, turn: 0 }; ac.legStart = ac.pos; ac.clearedAlt = ac.cruiseAlt; }
-      ui.toast(`${ac.callsign} returned to automation`);
+      if (ac.dir === 'ARR' && !ac.onGround && !(ac.appr && ac.appr.established) && w.airport(ac.to)) w.automation.planArrival(ac, ac.pos);
+      if (ac.dir !== 'ARR' && !ac.onGround) { ac.lat = { mode: 'LNAV', hdg: null, turn: 0 }; ac.legStart = ac.pos; ac.clearedAlt = ac.cruiseAlt; }
+      ui.toast(t('returnedAuto', { cs: ac.callsign }));
     },
   };
+}
+
+function lineupPath(ac, ap, r) {
+  const g = ap.ground; const { entry } = g.holdingVertex(r);
+  const pts = [ac.pos, g.v[entry]]; if (dist(g.v[entry], r.start) > 0.03) pts.push(r.start);
+  pts.push(project(r.start, r.trueHdg, 0.02));
+  ac.taxi = { pts, i: 0, reverse: false, maxSpd: 12 }; ac.phase = 'LINEUP';
 }
