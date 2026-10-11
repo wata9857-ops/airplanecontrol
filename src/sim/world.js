@@ -75,13 +75,18 @@ export class World {
     if (ap.configLocked) return;
     const w = this.wind[ap.icao];
     let best = ap.configIdx, bestScore = -Infinity;
+    const clock = this.clock;
+    const inWin = (t) => (t[0] <= t[1] ? clock >= t[0] && clock < t[1] : clock >= t[0] || clock < t[1]);
     ap.configs.forEach((c, i) => {
+      if (c.manualOnly) return;
       const rwys = [...c.arr, ...c.dep].map((id) => ap.runways.get(id)).filter(Boolean);
       if (!rwys.length || rwys.some((r) => r.closed)) return;
-      // headwind component on the primary arrival runway
+      // headwind component on the primary arrival runway (tailwind limit ~5 kt)
       const r = ap.runways.get(c.arr[0]);
       const head = w.spd * Math.cos(rad(w.dir - r.magHdg));
-      const score = head + (c.preferred ? 3 : 0) + (i === ap.configIdx ? 2 : 0);
+      let score = head + (c.preferred ? 3 : 0) + (c.bias ?? 0) + (i === ap.configIdx ? 2 : 0);
+      if (c.time) { if (!inWin(c.time)) return; score += 4; }
+      if (head < -(c.tailwindLimit ?? 5)) score -= 20;
       if (score > bestScore) { bestScore = score; best = i; }
     });
     if (best !== ap.configIdx) {
@@ -113,6 +118,7 @@ export class World {
     }
     this.automation.update(dt);
     this.conflicts.update(dt);
+    if (Math.floor(this.time / 60) !== Math.floor((this.time - dt) / 60)) for (const ap of this.airports.values()) this.autoSelectConfig(ap);
     this.cleanup();
   }
 

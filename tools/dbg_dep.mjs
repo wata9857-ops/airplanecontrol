@@ -6,7 +6,7 @@ const w0 = rd('world');
 const data = { ...w0, nav: rd('nav'), geo: rd('geo_land'), layouts: Object.fromEntries(['RJBB', 'RJTT', 'RJAA', 'RJOO', 'RJBE'].map((k) => [k, rd('layout_' + k)])) };
 const icao = process.argv[2] || 'RJTT';
 const world = new World(data); data.airwayGraph = new AirwayGraph(world);
-world.startClock = 8 * 3600;
+world.startClock = (process.env.T ? +process.env.T : 8) * 3600; if (process.env.WIND) for (const ap of world.airports.values()) world.wind[ap.icao] = { dir: +process.env.WIND, spd: 12 }; for (const ap of world.airports.values()) world.autoSelectConfig(ap, true);
 for (let s = 0; s < (+(process.argv[3]||30)) * 120; s++) world.step(SIM_DT);
 const ap = world.airport(icao);
 console.log('config', world.config(ap).name);

@@ -14,7 +14,9 @@ const minutes = +(process.argv[3] || 90);
 const world = new World(data);
 data.airwayGraph = new AirwayGraph(world);
 world.startClock = (hh * 60 + mm) * 60;
+if (process.env.WIND) for (const ap of world.airports.values()) { world.wind[ap.icao] = { dir: +process.env.WIND, spd: 12 }; }
 for (const ap of world.airports.values()) world.autoSelectConfig(ap, true);
+console.log('configs', [...world.airports.values()].map((a) => a.iata + ': ' + world.config(a).name).join(' | '));
 
 const t0 = Date.now();
 const firstSeen = new Map();
@@ -42,3 +44,7 @@ console.log('issues', issues.length); issues.slice(0, 40).forEach((i) => console
 const kinds = {};
 for (const e of world.events) if (e.kind !== 'info') kinds[e.msg.split(' ').slice(0, 2).join(' ')] = (kinds[e.msg.split(' ').slice(0, 2).join(' ')] || 0) + 1;
 console.log('recent warn/alert events', world.events.filter((e) => e.kind !== 'info').slice(-25).map((e) => world.clockStr(e.t).slice(0, 5) + ' ' + e.msg).join('\n'));
+const top = world.aircraft.filter((a) => a.dir === 'ARR' && !a.onGround).sort((a, b) => b.delay - a.delay).slice(0, 8);
+console.log('top delays:\n' + top.map((a) => `  ${a.callsign} ${a.to} rwy ${a.arrRwy?.id} delay ${Math.round(a.delay)}s seq ${a.seq} hold ${a.hold ? a.hold.fix.id + '@' + a.hold.level + (a.hold.exit ? ' EXIT' : '') : '-'} wp ${a.activeWp?.id} dtg ${a.distToGo().toFixed(0)} alt ${Math.round(a.alt)}`).join('\n'));
+const q = {}; for (const a of world.aircraft) if (a.dir === 'ARR' && !a.onGround && a.arrRwy) { const k = a.to + ' ' + a.arrRwy.id; q[k] = (q[k] || 0) + 1; }
+console.log('arrivals airborne per runway', JSON.stringify(q));

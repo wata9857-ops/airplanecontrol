@@ -142,11 +142,12 @@ export class Aircraft {
     }
     // temporary level-off restriction from the conflict-resolution logic
     if (this.hold && this.hold.level != null && !this.manual.alt && !this.hold.exit) tgtAlt = this.hold.level;
-    if (this.restrict && !this.manual.alt) {
+    if (this.restrict && !this.manual.alt && !(this.hold && this.hold.level != null)) {
       if (this.restrict.to != null) tgtAlt = this.restrict.to;
       if (this.restrict.max != null && tgtAlt > this.restrict.max) tgtAlt = Math.max(this.restrict.max, Math.min(tgtAlt, this.alt));
       if (this.restrict.min != null && tgtAlt < this.restrict.min) tgtAlt = Math.min(this.restrict.min, Math.max(tgtAlt, this.alt));
     }
+    this.tgtAltEff = tgtAlt;
     if (this.appr && this.appr.gsCaptured) {
       const thrElev = this.appr.rwy.elev || 0;
       const gsAlt = thrElev + 50 + this.appr.distThr * FT_PER_NM * Math.tan(rad(this.appr.rwy.gp || 3));

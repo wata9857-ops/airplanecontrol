@@ -409,21 +409,59 @@ export class Automation {
     return this.w.time + t;
   }
 
+  // Persistent arrival sequence per runway (AMAN): aircraft are inserted once,
+  // by ETA, and keep their position. Emergencies go to the front (behind
+  // aircraft already close in on final); aircraft re-joining after a
+  // go-around are inserted with priority.
   sequenceArrivals(ap) {
     const cfg = this.w.config(ap);
+    ap.seq = ap.seq || {};
     for (const rid of cfg.arr) {
       const r = ap.runways.get(rid);
       if (!r) continue;
-      const list = this.w.aircraft.filter((a) => a.arrRwy === r && a.dir === 'ARR' && !a.onGround && a.phase !== 'GOAROUND');
+      const live = (a) => a.arrRwy === r && a.dir === 'ARR' && !a.onGround && a.phase !== 'GOAROUND' && this.w.aircraft.includes(a);
+      let list = (ap.seq[rid] || []).filter(live);
+      const members = new Set(list);
       for (const a of list) a._eta = this.eta(a);
-      // frozen order inside 35 NM, priority/emergency first
-      list.sort((a, b) => {
-        const pa = a.emergency ? -1e6 : a.priority ? -150 : 0, pb = b.emergency ? -1e6 : b.priority ? -150 : 0;
-        const fa = a.seqFrozen ? a._seqKey : a._eta, fb = b.seqFrozen ? b._seqKey : b._eta;
-        return (pa + fa) - (pb + fb);
-      });
+      const fresh = this.w.aircraft.filter((a) => live(a) && !members.has(a));
+      for (const a of fresh) {
+        a._eta = this.eta(a);
+        let pos = list.length;
+        if (a.emergency || a.priority) {
+          // in front of everything not yet within ~8 NM of the threshold
+          pos = list.findIndex((o) => !(o.appr?.established && o.appr.distThr < 8) && !o.emergency);
+          if (pos < 0) pos = list.length;
+        } else {
+          // by ETA, but never ahead of aircraft already committed (holding / inside 35 NM)
+          for (let i = list.length - 1; i >= 0; i--) {
+            const o = list[i];
+            if (o._eta <= a._eta || o.distToGo() < 35 || o.appr?.established) { pos = i + 1; break; }
+            pos = i;
+          }
+        }
+        list.splice(pos, 0, a);
+        a.priority = false;
+      }
+      // an emergency already in the list moves to the front
+      const em = list.filter((a) => a.emergency && !a._emSeq);
+      for (const a of em) {
+        list = list.filter((x) => x !== a);
+        let pos = list.findIndex((o) => !(o.appr?.established && o.appr.distThr < 8));
+        if (pos < 0) pos = list.length;
+        list.splice(pos, 0, a); a._emSeq = true;
+      }
+      // re-optimise: swap neighbours when the follower would arrive >90 s earlier
+      // and neither is committed (inside 35 NM / on the approach)
+      const committed = (x) => x.appr?.established || x.distToGo() < 35 || x.emergency;
+      for (let i = 0; i + 1 < list.length; i++) {
+        const x = list[i], y = list[i + 1];
+        if (!committed(x) && !committed(y) && y._eta + 90 < x._eta) { list[i] = y; list[i + 1] = x; }
+      }
+      ap.seq[rid] = list;
+
       let prev = null, prevSlot = -Infinity;
-      const mixed = (cfg.mixed || []).includes(rid) && ap.depQueue.some((d) => d.depRwy === r);
+      const mixed = ((cfg.mixed || []).includes(rid) && ap.depQueue.some((d) => d.depRwy === r))
+        || ap.depQueue.some((d) => (d.depRwy?.crossing || []).includes(rid));
       list.forEach((a, i) => {
         let slot = a._eta;
         if (prev) {
@@ -432,7 +470,6 @@ export class Automation {
           slot = Math.max(slot, prevSlot + gap);
         }
         a.slot = slot; a.seq = i + 1; a.delay = slot - a._eta;
-        if (!a.seqFrozen && a.distToGo() < 35) { a.seqFrozen = true; a._seqKey = slot; }
         this.w.stats.maxDelay = Math.max(this.w.stats.maxDelay, a.delay);
         this.absorbDelay(a, prev);
         prev = a; prevSlot = slot;
@@ -449,7 +486,7 @@ export class Automation {
       let k = a.routeIdx; while (k < a.route.length && !a.route[k].hold) k++;
       const hw = a.route[k];
       const stackBusy = hw && this.w.aircraft.some((o) => o !== a && o.hold && o.hold.fix.id === hw.id);
-      const need = hw ? (stackBusy ? 20 : hw.hold.big ? 240 : 110) : Infinity;
+      const need = hw ? (stackBusy ? 30 : hw.hold.big ? 240 : 110) : Infinity;
       a.holdRequest = !!hw && a.delay > need;
       if (hw && a.holdRequest && k === a.routeIdx && dist(a, hw) < 1.5) {
         a.holdRequest = false;
@@ -488,7 +525,9 @@ export class Automation {
         // take-off clearance: runway clear, departure interval, no close arrival
         if (r.occupiedBy && r.occupiedBy !== lined) continue;
         if (w.time - r.lastDep < this.depInterval(ap, r.lastDepAc, lined)) continue;
-        if (arrivalWithin(3) || crossOcc) continue;
+        const crossArr = w.aircraft.some((a) => !a.onGround && a.appr?.established && a.arrRwy && a.arrRwy.airport === ap && (r.crossing || []).includes(a.arrRwy.id) && a.appr.distThr < 2 && a.appr.distThr > -0.5);
+        const sameArr = w.aircraft.some((a) => !a.onGround && a.appr?.established && a.arrRwy === r && a.appr.distThr < 3 && a.appr.distThr > -0.5);
+        if (sameArr || crossArr || crossOcc) continue;
         lined.takeoffCleared = true; r.occupiedBy = lined;
         w.log(`${lined.callsign} RWY ${r.id} cleared for take-off`, 'info', lined);
         continue;
@@ -499,8 +538,13 @@ export class Automation {
       const occ = r.occupiedBy;
       if (occ && !(occ.phase === 'TAKEOFF' || !occ.onGround)) continue;
       // time until the next arrival to this (or a crossing) runway reaches the threshold
-      const tArr = Math.min(Infinity, ...w.aircraft.filter((a) => !a.onGround && a.arrRwy && a.arrRwy.airport === ap && (a.arrRwy === r || (r.crossing || []).includes(a.arrRwy.id)) && a.dir === 'ARR')
-        .map((a) => (a.appr && a.appr.established ? a.appr.distThr : a.distToGo()) / Math.max(a.gs, 120) * 3600));
+      // time until the next arrival reaches the threshold: same runway (must be airborne
+      // before ~2 NM) or a crossing runway (must be through the intersection, ~45 s of roll)
+      const tFor = (a) => (a.appr && a.appr.established ? a.appr.distThr : a.distToGo()) / Math.max(a.gs, 120) * 3600;
+      const arrs = w.aircraft.filter((a) => !a.onGround && a.dir === 'ARR' && a.arrRwy && a.arrRwy.airport === ap);
+      const tSame = Math.min(Infinity, ...arrs.filter((a) => a.arrRwy === r).map(tFor));
+      const tCross = Math.min(Infinity, ...arrs.filter((a) => (r.crossing || []).includes(a.arrRwy.id)).map(tFor));
+      const tArr = Math.min(tSame, tCross + 25);
       const wait = Math.max(0, this.depInterval(ap, r.lastDepAc, head) - (w.time - r.lastDep));
       const g = ap.ground;
       const { entry } = g.holdingVertex(r);
@@ -539,7 +583,7 @@ export class Automation {
       stacks.get(k).push(ac);
     }
     for (const [id, list] of stacks) {
-      list.sort((x, y) => (x.hold.since ?? 0) - (y.hold.since ?? 0));
+      list.sort((x, y) => (x.seq ?? 99) - (y.seq ?? 99) || (x.hold.since ?? 0) - (y.hold.since ?? 0)); // landing order = stack order
       const wp = list[0].route.find((w) => w.id === id) || {};
       const elev = this.w.elevFor(list[0]) || 0;
       let base = wp.altMin ?? wp.altMax ?? (wp.hold?.big ? 13000 : 5000);
@@ -559,14 +603,16 @@ export class Automation {
     for (const c of w.conflicts.list) {
       const { a, b } = c;
       if (a.appr?.established && b.appr?.established) continue;
-      const vertMover = (x) => Math.abs(x.vs) > 300 || Math.abs(x.clearedAlt - x.alt) > 300;
+      if (a.hold && b.hold) continue; // stack levels take care of holders
+      const tg = (x) => x.tgtAltEff ?? x.clearedAlt;
+      const vertMover = (x) => Math.abs(x.vs) > 300 || Math.abs(tg(x) - x.alt) > 300;
       let mover = null, other = null;
-      const candidates = [[a, b], [b, a]].filter(([x]) => !x.manual.alt && !x.appr?.established && !x.onGround && !x.emergency);
+      const candidates = [[a, b], [b, a]].filter(([x]) => !x.manual.alt && !x.appr?.established && !x.onGround && !x.emergency && !x.hold);
       // prefer the one changing level; a departure keeps climbing if the other can stop instead
       for (const [x, y] of candidates) if (vertMover(x) && !mover) { mover = x; other = y; }
       if (mover && mover.dir === 'DEP' && candidates.some(([x]) => x === other) && vertMover(other)) { const t = mover; mover = other; other = t; }
-      const isClimb = (x) => x.clearedAlt > x.alt + 300 || x.vs > 300;
-      const isDesc = (x) => x.clearedAlt < x.alt - 300 || x.vs < -300 || (x.vnav && x.vs < -100);
+      const isClimb = (x) => tg(x) > x.alt + 300 || x.vs > 300;
+      const isDesc = (x) => tg(x) < x.alt - 300 || x.vs < -300;
       const free = (x) => candidates.some(([y]) => y === x);
       const [lo, hi] = a.alt < b.alt ? [a, b] : [b, a];
       if (isClimb(lo) && isDesc(hi) && free(lo) && free(hi)) {
@@ -579,7 +625,7 @@ export class Automation {
       }
       if (mover) {
         const otherAlt = other.alt + Math.max(-1500, Math.min(1500, other.vs / 60 * 30));
-        const climbing = mover.clearedAlt > mover.alt || mover.vs > 300;
+        const climbing = tg(mover) > mover.alt + 300 || mover.vs > 300;
         const lvl = climbing ? Math.floor((otherAlt - 1000) / 1000) * 1000 : Math.ceil((otherAlt + 1000) / 1000) * 1000;
         const elev = w.elevFor(mover) || 0;
         if (climbing && lvl > mover.alt - 300 && lvl > elev + 2000) mover.restrict = { max: lvl, until: w.time + 60 };

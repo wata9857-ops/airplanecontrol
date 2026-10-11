@@ -5,7 +5,7 @@ const rd = (f) => JSON.parse(fs.readFileSync(`data/${f}.json`, 'utf8'));
 const w0 = rd('world');
 const data = { ...w0, nav: rd('nav'), geo: rd('geo_land'), layouts: Object.fromEntries(['RJBB', 'RJTT', 'RJAA', 'RJOO', 'RJBE'].map((k) => [k, rd('layout_' + k)])) };
 const world = new World(data); data.airwayGraph = new AirwayGraph(world);
-world.startClock = 8 * 3600;
+world.startClock = (process.env.T ? +process.env.T : 8) * 3600; if (process.env.WIND) for (const ap of world.airports.values()) world.wind[ap.icao] = { dir: +process.env.WIND, spd: 12 }; for (const ap of world.airports.values()) world.autoSelectConfig(ap, true);
 const seen = new Set(); const cats = {};
 const origLog = world.log.bind(world);
 world.log = (msg, kind, ac) => { origLog(msg, kind, ac); if (/GO AROUND/.test(msg)) { const k = 'GA ' + msg.replace(/^.*\(/, '(').replace(/[\d.]+ NM/, 'x NM'); cats[k] = (cats[k] || 0) + 1; } };
