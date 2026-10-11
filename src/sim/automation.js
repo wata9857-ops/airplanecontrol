@@ -7,6 +7,7 @@ import { WAKE_NM, tasFromIas } from './performance.js';
 import { alongRunway } from './ground.js';
 
 const FINAL_MIN_NM = 3.0;   // radar minimum on final (Japan terminal radar 3 NM)
+const SMALL_TYPES = new Set(['DH8D', 'AT76', 'AT46', 'E170', 'E190', 'CRJ7', 'B737']);
 
 export class Automation {
   constructor(world) {
@@ -49,6 +50,7 @@ export class Automation {
     const cfg = this.w.config(ap);
     const cands = cfg.dep.map((id) => ap.runways.get(id)).filter((r) => r && !r.closed);
     if (!cands.length) return null;
+    if (cfg.smallDep && SMALL_TYPES.has(this._depType)) { const r = ap.runways.get(cfg.smallDep); if (r && !r.closed) return r; }
     if (cands.length === 1) return cands[0];
     const brg = bearing(ap, destPt);
     const pref = cfg.depSplit?.find((s) => inSector(brg, s.from, s.to))?.rwy;
@@ -68,7 +70,9 @@ export class Automation {
       if (wps.length < 2) continue;
       const first = wps[0];
       const off = Math.abs(angDiff(bearing(ap, first), bearing(ap, fromPt)));
-      const score = off * 2 + dist(fromPt, first) * 0.05;
+      const lastId = wps.at(-1).id;
+      const connects = this.procs(ap.icao).approaches.some((a) => a.runway === rwy.id && a.legs.some((l) => l.fix === lastId));
+      const score = off * 2 + dist(fromPt, first) * 0.05 + (connects ? 0 : 80);
       if (score < bs) { bs = score; best = { s, wps }; }
     }
     return best;
@@ -125,7 +129,7 @@ export class Automation {
     const star = this.pickStar(ap, rwy, fromPt);
     let wps = star ? [...star.wps] : [];
     const app = this.pickApproach(ap, rwy, wps.at(-1));
-    if (app && app.wps.length) wps.push(...app.wps);
+    if (app) wps.push(...app.wps); // may be empty when the STAR ends at the FAF
     else wps.push(...this.vectorPattern(rwy, wps.at(-1) || fromPt));
     // ensure route ends on the runway centreline
     const fw = this.finalWps(rwy);
@@ -156,6 +160,7 @@ export class Automation {
   planDeparture(ac) {
     const ap = this.w.airport(ac.from);
     const destPt = this.w.data.worldAirports[ac.to] ? toXY(...this.w.data.worldAirports[ac.to]) : project(ap, 270, 300);
+    this._depType = ac.type;
     const rwy = this.pickDepRunway(ap, destPt);
     ac.depRwy = rwy;
     const sids = this.procs(ap.icao).sids.filter((s) => !s.runways?.length || s.runways.includes(rwy.id));
@@ -373,7 +378,8 @@ export class Automation {
       const wp = ac.activeWp;
       const dThr = dist(ac, r.thr);
       const onFinalLegs = wp && (wp.kind === 'APP' || wp.kind === 'FNL' || wp.kind === 'THR' || (wp.kind === 'VEC' && wp.altMin != null));
-      if (dThr < 30 && (onFinalLegs || (ac.manual.hdg && ac.autoClearOnVector))) {
+      const outside = ac.alongToThr(r) > 3;
+      if (dThr < 30 && outside && (onFinalLegs || (ac.manual.hdg && ac.autoClearOnVector))) {
         ac.clearApproach(r);
         ac.phase = 'APPROACH';
         w.log(`${ac.callsign} cleared ${ac.appName || 'ILS ' + r.id} approach`, 'info', ac);
@@ -389,8 +395,14 @@ export class Automation {
       if (r.closed) { this.goAround(ac, 'runway closed'); return; }
       if (ac.alt <= (r.elev || 0) + 3 && ac.appr.gsCaptured) this.touchdown(ac);
     } else if (ac.appr && ac.appr.cleared && ac.appr.distThr < 2.0) {
-      // not established close in: unstable -> go around
-      this.goAround(ac, 'not established');
+      // not established close in: go around if low on final, otherwise re-plan
+      if (ac.alt - (r.elev || 0) < 2500 && Math.abs(angDiff(ac.trk, r.trueHdg)) < 60) this.goAround(ac, 'not established');
+      else { ac.appr = null; if (!ac.manual.hdg) this.planArrival(ac, ac.pos); }
+    }
+    // stabilised approach criterion: more than ~1000 ft above the glidepath inside 5 NM
+    if (ac.appr?.established && ac.appr.distThr < 5 && ac.appr.distThr > 0.5) {
+      const gsAlt = (r.elev || 0) + 50 + ac.appr.distThr * 6076 * Math.tan((r.gp || 3) * Math.PI / 180);
+      if (ac.alt - gsAlt > 1000) { this.goAround(ac, 'unstable (high)'); return; }
     }
   }
 
@@ -460,7 +472,8 @@ export class Automation {
       ap.seq[rid] = list;
 
       let prev = null, prevSlot = -Infinity;
-      const mixed = ((cfg.mixed || []).includes(rid) && ap.depQueue.some((d) => d.depRwy === r))
+      const isMixed = (cfg.mixed || []).includes(rid) || cfg.dep.includes(rid);
+      const mixed = (isMixed && ap.depQueue.some((d) => d.depRwy === r))
         || ap.depQueue.some((d) => (d.depRwy?.crossing || []).includes(rid));
       list.forEach((a, i) => {
         let slot = a._eta;
@@ -494,17 +507,29 @@ export class Automation {
         this.w.log(`${a.callsign} hold at ${hw.id}, expect further clearance (delay ${Math.round(a.delay / 60)} min)`, 'warn', a);
       }
     }
-    if (a.hold && !a.manual.hdg && a.delay < 45) { a.hold.exit = true; a.holdRequest = false; }
+    // (hold exit is decided by manageStacks: lowest aircraft first)
     // speed control
     let spd = null;
     if (a.delay > 60 && dtg > 15) spd = a.alt > 10500 ? 250 : (dtg > 30 ? 220 : 200);
     else if (a.delay > 25 && dtg > 12) spd = 210;
-    // final-approach spacing behind the leader
-    if (leader && a.appr && a.appr.established && leader.appr && leader.appr.established) {
-      const gap = dist(a, leader);
+    // spacing behind the leader measured along the remaining track (works for merging flows)
+    if (leader && !leader.onGround && leader.dir === 'ARR') {
       const need = Math.max(FINAL_MIN_NM, WAKE_NM[leader.wake]?.[a.wake] || 0);
-      if (gap < need + 0.5) spd = Math.max(a.perf.vapp, Math.min(leader.ias - 10, 170));
-      if (gap < need - 0.7 && a.appr.distThr < 5 && !leader.onGround) this.goAround(a, `spacing ${gap.toFixed(1)} NM`);
+      const dtgL = leader.appr?.established ? leader.appr.distThr : leader.distToGo();
+      const trackGap = dtg - dtgL;
+      if (dtg < 35) {
+        if (trackGap < need + 1.5) spd = Math.max(dtg > 6 ? 160 : a.perf.vapp, Math.min(spd ?? 999, leader.ias - 15, dtg > 15 ? 210 : 180));
+        // well inside the required spacing and still outside 12 NM: one 360° orbit
+        if (trackGap < need - 0.5 && dtg > 12 && !a.appr?.established && !a.hold && !a.manual.hdg && a.lat.mode === 'LNAV' && (a.orbits || 0) < 2) {
+          a.startOrbit(angDiff(a.trk, bearing(a, leader)) > 0 ? -1 : 1);
+          a.orbits = (a.orbits || 0) + 1;
+          this.w.log(`${a.callsign} make a 360 for spacing behind ${leader.callsign}`, 'info', a);
+        }
+      }
+      if (a.appr?.established && leader.appr?.established) {
+        const gap = dist(a, leader);
+        if (gap < need - 0.7 && a.appr.distThr < 5) this.goAround(a, `spacing ${gap.toFixed(1)} NM`);
+      }
     }
     a.autoSpd = spd ? Math.max(spd, a.perf.vapp + 10) : null;
   }
@@ -545,7 +570,7 @@ export class Automation {
       const tSame = Math.min(Infinity, ...arrs.filter((a) => a.arrRwy === r).map(tFor));
       const tCross = Math.min(Infinity, ...arrs.filter((a) => (r.crossing || []).includes(a.arrRwy.id)).map(tFor));
       const tArr = Math.min(tSame, tCross + 25);
-      const wait = Math.max(0, this.depInterval(ap, r.lastDepAc, head) - (w.time - r.lastDep));
+      const wait = occ && occ.onGround ? this.depInterval(ap, occ, head) + 35 : Math.max(0, this.depInterval(ap, r.lastDepAc, head) - (w.time - r.lastDep));
       const g = ap.ground;
       const { entry } = g.holdingVertex(r);
       const lineupPts = [head.pos, g.v[entry]];
@@ -583,12 +608,35 @@ export class Automation {
       stacks.get(k).push(ac);
     }
     for (const [id, list] of stacks) {
-      list.sort((x, y) => (x.seq ?? 99) - (y.seq ?? 99) || (x.hold.since ?? 0) - (y.hold.since ?? 0)); // landing order = stack order
       const wp = list[0].route.find((w) => w.id === id) || {};
       const elev = this.w.elevFor(list[0]) || 0;
       let base = wp.altMin ?? wp.altMax ?? (wp.hold?.big ? 13000 : 5000);
       base = Math.max(base, elev + 3000);
-      list.forEach((ac, i) => { ac.hold.level = base + i * 1000; });
+      const staying = list.filter((a) => !a.hold.exit);
+      // new aircraft join on top of the stack
+      const top = () => Math.max(base - 1000, ...staying.filter((a) => a.hold.level != null).map((a) => a.hold.level));
+      for (const a of staying.filter((x) => x.hold.level == null).sort((x, y) => x.alt - y.alt)) a.hold.level = top() + 1000;
+      // step down one level at a time when the level below is free and reached
+      staying.sort((x, y) => x.hold.level - y.hold.level);
+      const occupied = new Set(staying.map((a) => a.hold.level));
+      for (const a of staying) {
+        const below = a.hold.level - 1000;
+        const lowerAc = staying.find((o) => o !== a && o.hold.level === below);
+        if (below >= base && !occupied.has(below) && !lowerAc && Math.abs(a.alt - a.hold.level) < 300
+            && !list.some((o) => o !== a && Math.abs(o.alt - below) < 900 && o.alt < a.alt)) {
+          occupied.delete(a.hold.level); a.hold.level = below; occupied.add(below);
+        }
+      }
+      // while aircraft descend into the stack keep 1000 ft above the one below
+      staying.forEach((a, i) => {
+        const below = staying[i - 1];
+        a.hold.levelEff = below ? Math.max(a.hold.level, Math.ceil((below.alt + 1000) / 100) * 100) : a.hold.level;
+      });
+      // the lowest holder leaves first once anyone in the stack is due
+      if (staying.length && staying.some((a) => a.delay < 45)) {
+        const lowest = staying[0];
+        if (lowest.alt - lowest.hold.level < 300) { lowest.hold.exit = true; lowest.holdRequest = false; }
+      }
     }
   }
 
@@ -607,7 +655,8 @@ export class Automation {
       const tg = (x) => x.tgtAltEff ?? x.clearedAlt;
       const vertMover = (x) => Math.abs(x.vs) > 300 || Math.abs(tg(x) - x.alt) > 300;
       let mover = null, other = null;
-      const candidates = [[a, b], [b, a]].filter(([x]) => !x.manual.alt && !x.appr?.established && !x.onGround && !x.emergency && !x.hold);
+      const candidates = [[a, b], [b, a]].filter(([x]) => !x.manual.alt && !x.appr?.established && !x.onGround && !x.emergency && !x.hold
+        && !(x.dir === 'ARR' && x.arrRwy && dist(x, x.arrRwy.thr) < 15));
       // prefer the one changing level; a departure keeps climbing if the other can stop instead
       for (const [x, y] of candidates) if (vertMover(x) && !mover) { mover = x; other = y; }
       if (mover && mover.dir === 'DEP' && candidates.some(([x]) => x === other) && vertMover(other)) { const t = mover; mover = other; other = t; }
@@ -637,13 +686,15 @@ export class Automation {
       // both level: in-trail speed control, otherwise a 1000 ft step for the arrival / lower-priority one
       const [lead, foll] = trailOrder(a, b);
       if (lead && !foll.manual.spd && Math.abs(angDiff(a.trk, b.trk)) < 40) { foll.autoSpd = Math.max(foll.perf.vmin, Math.round(lead.ias - 15)); continue; }
-      const pick = candidates.find(([x]) => x.dir === 'ARR') || candidates[0];
-      if (!pick) continue;
-      const [x, y] = pick;
-      const elev = w.elevFor(x) || 0;
-      const step = x.alt <= y.alt ? -1000 : 1000;
-      const tgt = Math.round((x.alt + step) / 1000) * 1000;
-      if (tgt > elev + 2500) x.restrict = { to: tgt, until: w.time + 90 };
+      // both level: the lower arrival steps down 1000 ft (or the higher one climbs if it is a departure)
+      const lower = a.alt <= b.alt ? a : b, upper = lower === a ? b : a;
+      const free2 = (x) => candidates.some(([y]) => y === x);
+      if (lower.dir === 'ARR' && free2(lower)) {
+        const tgt = Math.floor((lower.alt - 100) / 1000) * 1000;
+        if (tgt > (w.elevFor(lower) || 0) + 2500) lower.restrict = { to: tgt, until: w.time + 90 };
+      } else if (upper.dir === 'DEP' && free2(upper)) {
+        upper.restrict = { to: Math.ceil((upper.alt + 100) / 1000) * 1000, until: w.time + 90 };
+      }
     }
   }
 }

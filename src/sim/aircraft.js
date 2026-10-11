@@ -8,6 +8,8 @@ const G_FT_PER_NM = 300;          // planning descent gradient (~2.8°)
 const FT_PER_NM = 6076.12;
 
 let nextId = 1;
+// along-track distance of a point to the runway threshold (positive before it)
+const alongPt = (r, p) => (r.thr.x - p.x) * Math.sin(rad(r.trueHdg)) + (r.thr.y - p.y) * Math.cos(rad(r.trueHdg));
 
 export class Aircraft {
   constructor(o) {
@@ -107,6 +109,12 @@ export class Aircraft {
     } else if (L.mode === 'HDG') {
       desiredHdg = L.hdg; turnDir = L.turn;
       if (Math.abs(angDiff(this.hdg, desiredHdg)) < 2) L.turn = 0;
+    } else if (L.mode === 'ORBIT') {
+      // continuous rate-one turn for 360°, then resume LNAV
+      const step = Math.abs(this.turnRate || 3) * dt;
+      L.remaining -= step;
+      desiredHdg = norm360(this.hdg + L.turn * 40); turnDir = L.turn;
+      if (L.remaining <= 0) { this.lat = { mode: L.resume || 'LNAV', hdg: L.resumeHdg ?? null, turn: 0 }; this.legStart = this.pos; }
     } else if (L.mode === 'HOLD' && this.hold) {
       const r = this.holdGuidance(dt, wind); desiredHdg = r.hdg; turnDir = r.turn;
     } else if (L.mode === 'LNAV') {
@@ -141,11 +149,19 @@ export class Aircraft {
       if (c != null) tgtAlt = Math.min(tgtAlt, c);
     }
     // temporary level-off restriction from the conflict-resolution logic
-    if (this.hold && this.hold.level != null && !this.manual.alt && !this.hold.exit) tgtAlt = this.hold.level;
+    if (this.hold && this.hold.level != null && !this.manual.alt && !this.hold.exit) tgtAlt = Math.min(this.alt, this.hold.levelEff ?? this.hold.level) > this.hold.level ? Math.max(this.hold.levelEff ?? this.hold.level, this.hold.level) : (this.hold.levelEff ?? this.hold.level);
     if (this.restrict && !this.manual.alt && !(this.hold && this.hold.level != null)) {
       if (this.restrict.to != null) tgtAlt = this.restrict.to;
       if (this.restrict.max != null && tgtAlt > this.restrict.max) tgtAlt = Math.max(this.restrict.max, Math.min(tgtAlt, this.alt));
       if (this.restrict.min != null && tgtAlt < this.restrict.min) tgtAlt = Math.min(this.restrict.min, Math.max(tgtAlt, this.alt));
+    }
+    // on the localiser but not yet on the glidepath: descend to just below it
+    if (this.appr && this.appr.established && !this.appr.gsCaptured && !this.manual.alt) {
+      const r = this.appr.rwy;
+      const gsBelow = (r.elev || 0) + 50 + this.appr.distThr * FT_PER_NM * Math.tan(rad(r.gp || 3)) - 200;
+      tgtAlt = Math.max((r.elev || 0) + 400, Math.min(this.alt, gsBelow));
+      // pass route points that are now behind the aircraft
+      while (this.activeWp && this.routeIdx < this.route.length - 1 && this.alongToThr(r) < alongPt(r, this.activeWp) - 0.2) this.routeIdx++;
     }
     this.tgtAltEff = tgtAlt;
     if (this.appr && this.appr.gsCaptured) {
@@ -184,6 +200,7 @@ export class Aircraft {
 
   descentRate(world) {
     const p = this.perf;
+    if (this.appr && this.appr.established && !this.appr.gsCaptured) return 2500;
     // Arrivals under VNAV follow the path; otherwise use typical idle descent
     if (this.vnav && !this.manual.alt) {
       const ceil = this.vnavCeiling(world);
@@ -337,7 +354,8 @@ export class Aircraft {
     const ti = trackInfo(this.pos, start, r.thr);
     // glideslope capture from below/at
     const gsAlt = (r.elev || 0) + 50 + this.alongToThr(r) * FT_PER_NM * Math.tan(rad(r.gp || 3));
-    if (!this.appr.gsCaptured && this.alt >= gsAlt - 150) { this.appr.gsCaptured = true; this.vnav = false; }
+    // capture from below / at the intercept altitude (never dive onto it from far above)
+    if (!this.appr.gsCaptured && this.alt >= gsAlt - 150 && this.alt <= gsAlt + 250) { this.appr.gsCaptured = true; this.vnav = false; }
     const track = norm360(r.trueHdg - Math.max(-30, Math.min(30, ti.cross * 60)));
     return this.headingForTrack(track, wind);
   }
@@ -354,6 +372,10 @@ export class Aircraft {
     this.hold = null;
     if (this.appr && !this.appr.established) this.appr = null;
     if (this.appr && this.appr.established) { this.appr = null; }
+  }
+  startOrbit(dir) {
+    const prev = this.lat;
+    this.lat = { mode: 'ORBIT', turn: dir, remaining: 360, resume: prev.mode === 'HDG' ? 'HDG' : 'LNAV', resumeHdg: prev.mode === 'HDG' ? prev.hdg : null };
   }
   cmdAltitude(ft) { this.clearedAlt = ft; this.vnav = false; }
   cmdDescendVia() { this.vnav = true; }

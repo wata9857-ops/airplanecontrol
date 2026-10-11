@@ -44,19 +44,9 @@ export function commands(w, ui) {
       say(ac, `${t} ${pad3(mag)}`, `${turn < 0 ? 'Left ' : turn > 0 ? 'Right ' : ''}heading ${pad3(mag)}`);
     },
     orbit(ac, dir) {
-      const m = Math.round(ac.magHdg);
-      ac.cmdHeading((m + 180 * dir + 360) % 360 || 360, dir, w);
+      ac.startOrbit(dir);
       ac.manual.hdg = true;
-      ac.orbit = { dir, start: m };
       say(ac, `make a ${dir < 0 ? 'left' : 'right'} three-sixty`, `${dir < 0 ? 'Left' : 'Right'} three-sixty`);
-      const check = setInterval(() => {
-        if (!w.aircraft.includes(ac) || ac.lat.mode !== 'HDG') { clearInterval(check); return; }
-        if (Math.abs(((ac.magHdg - ac.lat.hdg + 540) % 360) - 180) < 5 || ac.orbit?.stage === 2) {
-          if (!ac.orbit) { clearInterval(check); return; }
-          if (!ac.orbit.stage) { ac.orbit.stage = 1; ac.cmdHeading(ac.orbit.start || 360, ac.orbit.dir, w); }
-          else { clearInterval(check); ac.orbit = null; }
-        }
-      }, 500);
     },
     altitude(ac, ft) {
       const climb = ft > ac.alt;

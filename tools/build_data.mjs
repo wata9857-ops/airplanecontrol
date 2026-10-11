@@ -149,7 +149,7 @@ const airports = [
   {
     icao: 'RJOO', iata: 'ITM', name: 'Osaka Itami', nameJa: '大阪国際空港（伊丹）', major: true, elev: 39,
     configs: [
-      { name: '32 operation — ILS 32L', arr: ['32L'], dep: ['32L'], preferred: true, mixed: ['32L'], tailwindLimit: 10, bias: 14, note: 'Normal operation (verified); ~97% of the time' },
+      { name: '32 operation — ILS 32L', arr: ['32L'], dep: ['32L'], smallDep: '32R', preferred: true, mixed: ['32L'], tailwindLimit: 10, bias: 14, note: 'Normal operation (verified); ~97% of the time' },
       { name: '14 operation (circling)', arr: ['14R'], dep: ['14R'], mixed: ['14R'], note: 'Rare (~3%); circling from ILS 32L not modelled — vectors to 14R' },
     ],
     defaultWind: { dir: 320, spd: 6 }, curfew: [21 * 3600, 7 * 3600],
