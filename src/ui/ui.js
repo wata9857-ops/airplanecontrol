@@ -40,6 +40,14 @@ export class UI {
       const b = h('button', { 'data-v': v.id, title: v.label, onclick: () => this.setView(v) }, v.label);
       g.append(b);
     }
+    const vm = $('#viewMenu');
+    const LV = { 1: 'Level 1 — wide area / 広域', 2: 'Level 2 — terminal', 3: 'Level 3 — approach', 4: 'Level 4 — airport' };
+    let l2 = 0;
+    for (const v of VIEWS) {
+      if (v.level !== l2) { vm.append(h('div', { class: 'lv' }, LV[v.level])); l2 = v.level; }
+      vm.append(h('button', { 'data-v': v.id, onclick: () => { this.setView(v); vm.classList.add('hidden'); } }, v.label));
+    }
+    $('#btnView').onclick = () => vm.classList.toggle('hidden');
     $('#btnPause').onclick = () => { this.paused = !this.paused; $('#btnPause').textContent = this.paused ? '▶' : '❚❚'; $('#btnPause').classList.toggle('warn', this.paused); };
     $('#btnSpeed').onclick = () => { this.speed = SPEEDS[(SPEEDS.indexOf(this.speed) + 1) % SPEEDS.length]; $('#btnSpeed').textContent = '×' + this.speed; };
     $('#btnLists').onclick = () => this.toggleLists();
@@ -54,7 +62,8 @@ export class UI {
     if (v.airport) this.listAirport = v.airport;
     else if (/KANSAI/.test(v.id)) this.listAirport = 'RJBB';
     else if (/KANTO/.test(v.id)) this.listAirport = 'RJTT';
-    document.querySelectorAll('#areaBtns button').forEach((b) => b.classList.toggle('on', b.dataset.v === v.id));
+    document.querySelectorAll('#areaBtns button, #viewMenu button').forEach((b) => b.classList.toggle('on', b.dataset.v === v.id));
+    const bv = $('#btnView'); if (bv) bv.textContent = v.label + ' ▾';
   }
 
   toast(msg, ms = 2600) {
