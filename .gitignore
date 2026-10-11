@@ -1,0 +1,9 @@
+# large raw downloads (re-fetchable; see tools/ and README)
+research/raw/
+research/schedules_raw/
+research/tmp/
+node_modules/
+tools/_patch*.py
+tools/_patch*.js
+*.log
+.DS_Store

@@ -1,0 +1,9 @@
+{
+  "name": "JP ATC Sim — Kansai / Kanto",
+  "short_name": "JP ATC",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#04080c",
+  "theme_color": "#05090d"
+}

@@ -1,0 +1,338 @@
+{
+  "meta": {
+    "compiled": "2026-10-11",
+    "purpose": "Real-world Japanese ATC operating practice reference for an ATC simulation game. NOT for real-world navigation.",
+    "conventions": "verified=true means the value was read directly in the cited source during research. verified=false means approximation, inference, enthusiast/VATSIM data, or memory that could not be confirmed. Frequencies can change at any AIRAC cycle; enthusiast frequency lists are not official."
+  },
+  "sources": [
+    {"name": "JCAB 管制業務処理規程 (Air Traffic Control Procedures, version republished by JAPA, Jan 2023)", "url": "https://www.japa.or.jp/wp-content/uploads/2023/01/9162d597dd16c60378202f68d209f0f9.pdf", "notes": "Official Japanese ATC procedures manual. Source for radar separation (3/5 NM), wake turbulence tables (category and RECAT group), vertical separation, speed adjustment minima, simultaneous parallel ILS rules, Haneda simultaneous LDA/RNP approaches, Narita simultaneous parallel departures, and many English phraseology examples. 378 pages."},
+    {"name": "ATCAJ/JAPA Radio Telephony Meeting Vol.025 (2021-02-22) - wake turbulence revision", "url": "https://atcaj.or.jp/wp-content/uploads/2021/02/Radio_Telephony_Meeting_Vol_025.pdf", "notes": "Japan began trial ops of re-categorised wake separation on 2020-03-26; procedures amended 2020-11-05 together with ICAO PANS-ATM. Wake groups A-G are applied only at Narita and Haneda."},
+    {"name": "ATCAJ/JAPA Radio Telephony Meeting Vol.031 (2022-01-20) - speed limits", "url": "https://atcaj.or.jp/wp-content/uploads/2022/01/Radio_Telephony_Meeting_Vol_031.pdf", "notes": "Civil Aeronautics Act Art.82-2 and Enforcement Reg. Art.179: 250 kt IAS in control zones and in approach control areas at or below 10,000 ft. From 2021-12-30 the old control-zone limit below 3,000 ft (200/160 kt) was replaced by 250 kt for all aircraft."},
+    {"name": "MLIT 関西空域における飛行経路検討について (Nov 2022)", "url": "https://www.mlit.go.jp/koku/content/001520599.pdf", "notes": "KIX hourly limit was 45. A controller simulation of max hourly movements in the old airspace gave 47 (north wind) and 46 (south wind). Target about 60 per hour. Kobe limits. Itami 370/day (200 jet) and 07-21 hours."},
+    {"name": "Hyogo Prefecture - 関西国際空港及び神戸空港の飛行経路見直し（案）に対する要望結果と対応", "url": "https://web.pref.hyogo.lg.jp/ks06/documents/01_main-doc.pdf", "notes": "KIX north wind about 60% / south wind about 40% (5-year record). New routes: KIX departures 5,000 ft minimum over land, arrivals 4,000 ft. Arrival and departure runways swapped. New routes used 06:30-23:00 only. 23:00-06:00 traffic restricted to the Akashi/Kitan strait routes. Kobe departures capped at 3,000 ft under KIX arrivals at 4,000 ft."},
+    {"name": "Kobe Airport fan site - 関西3空港の飛行経路解説", "url": "https://www.kobeairport.jp/flightmap-kix-itm-ukb/", "notes": "Confirms that since 2025-03-20 KIX A runway (06R/24L) is mainly for arrivals and B runway (06L/24R) mainly for departures."},
+    {"name": "Wikipedia ja: 関西国際空港", "url": "https://ja.wikipedia.org/wiki/関西国際空港", "notes": "Runway lengths. From 2013 to March 2025 A=departures and B=arrivals, reversed on 2025-03-20. 2025 movements 206,731."},
+    {"name": "MLIT/TCAB 羽田空港の飛行経路", "url": "https://www.cab.mlit.go.jp/tcab/airport/list/haneda/flight-paths.html", "notes": "HND south wind about 40% / north wind about 60% annually. New route hours. 23:00-06:00 uses over-sea routes."},
+    {"name": "MLIT 羽田空港における滑走路運用・飛行経路の見直し（南風時/北風時）", "url": "https://www.mlit.go.jp/common/001302400.pdf", "notes": "HND capacity 80 to 90 movements per hour with the new routes. South wind new routes 15:00-19:00 (about 3 h effective). North wind 07:00-11:30 and 15:00-19:00."},
+    {"name": "MLIT ntrack 羽田 運用状況の区分 (2022-10-06)", "url": "https://www.ntrack.mlit.go.jp/appx/unkoujoukyou20221006.pdf", "notes": "Official HND runway-mode table with approach types and landing/departure runways for modes 1-9."},
+    {"name": "MLIT 2025 北風・南風の運用割合 (HND)", "url": "https://www.mlit.go.jp/koku/haneda/assets/pdf/2026012802.pdf", "notes": "Monthly HND north/south splits Apr-Oct 2025. Example: daytime 06-23 south wind share 56% Apr, 48% May, 69% Jun, 80% Jul, 75% Aug, 53% Sep, 7% Oct."},
+    {"name": "MLIT 羽田 国際線増便の実現方策 FAQ", "url": "https://www.mlit.go.jp/koku/haneda/archive/faq/pdf/06.pdf", "notes": "Explains runway interactions at HND: A-runway crossings, D-arrival vs C/A departures, and why D is not used in south wind under the new routes."},
+    {"name": "squawk.id (VATSIM Japan commentary) - RJTT STAR/IAP usage", "url": "https://squawk.id/vatsim-commentary/for-all-members/airport/rjtt/star-iap/", "notes": "VATSIM-oriented. HND STAR/approach pairings per mode. Matches the MLIT ntrack table."},
+    {"name": "squawk.id - RJTT midnight operation", "url": "https://squawk.id/vatsim-commentary/for-all-members/airport/rjtt/midnight-operation/", "notes": "VATSIM-oriented, AIP-derived. HND 23:00-06:00 runway use. Not independently verified against AIP."},
+    {"name": "squawk.id - 14,000ft or FL140", "url": "https://squawk.id/vatsim-commentary/for-controllers/student3/14000ft-or-fl140/", "notes": "Japan transition altitude 14,000 ft (14,000 ft and above expressed as flight levels). Lowest usable FL table by QNH in inHg."},
+    {"name": "NAA 年間発着枠30万回を超える運用について (2025-01-24)", "url": "https://www.narita-kinoukyouka.jp/document/250124_20_chiba.pdf", "notes": "NRT annual capacity 340k, slots raised from 300k to 340k from 2025-10-26. Hours: A runway 06-24, B runway 06-23 (B: max 10 flights in the 22:00 hour). Afternoon peak (14-18 h) at hourly cap."},
+    {"name": "sky-budget / NAA - C runway & slide operation", "url": "https://sky-budget.com/2025/04/13/narita-airport-3rd-runway/", "notes": "After C runway (3,500 m, target end of March 2029) and B extension to 3,500 m, 'slide operation' with 7 h of quiet time under each path and airport-wide hours 05:00-00:30. Capacity 500k/yr."},
+    {"name": "NAA 飛行コースについて", "url": "https://www.narita-airport.jp/ja/company/csr/course/", "notes": "Simultaneous parallel take-off/landing at NRT since 2011-10-20. Congestion procedures (6,000 ft turn delay in south wind; 4,000-5,000 ft arrivals in north wind)."},
+    {"name": "Wikipedia ja: 大阪国際空港", "url": "https://ja.wikipedia.org/wiki/大阪国際空港", "notes": "Runways A 14L/32R 1,828 m and B 14R/32L 3,000 m. ILS only on 32L. 14-ops circling ('伊丹カーブ'). Hours 07-21. 370 slots/day (200 jet). 2023 movements 137,871."},
+    {"name": "Wikipedia ja: 航空交通管制部 / 東京航空交通管制部 / 神戸航空交通管制部", "url": "https://ja.wikipedia.org/wiki/航空交通管制部", "notes": "Since 2025 there are 3 ACCs (Tokyo, Kobe, Fukuoka). Split at 33,500 ft: Tokyo and Kobe lower, Fukuoka upper and oceanic. Sapporo ACC abolished Oct 2024, Naha ACC 2018. Sector lists as of April 2025."},
+    {"name": "Wikipedia ja: 横田空域", "url": "https://ja.wikipedia.org/wiki/横田空域", "notes": "Covers airspace over 10 prefectures. Upper limit stepped about 12,000-23,000 ft. Partial returns 1992 (~10%) and 2008 (~20%). 2020 HND new arrival routes pass through it under Japanese control."},
+    {"name": "Airband Japan (航空無線Handbook) - KIX/ITM/UKB/HND/NRT/Tokyo Control/Kobe Control pages", "url": "https://airband-japan.jimdofree.com/近畿/関西国際空港/", "notes": "Enthusiast frequency lists. Sibling pages: /近畿/大阪国際空港/, /近畿/神戸空港/, /関東/東京国際空港/, /関東/成田国際空港/, /東京コントロール/, /神戸コントロール/. Undated."},
+    {"name": "yinlei.org RJBB AIP chart compilation (simulation use only)", "url": "https://yinlei.org/it-iot/doc/RJBB.pdf", "notes": "Japan AIP charts for RJBB. Many charts are old editions (EFF 2009-2012), so they predate the 2025 route change. Used only for typical altitudes/fixes (e.g., ILS Z 06R: IF ATACK 4,000 ft, FAF ZELDA 3,000 ft, MHA 4000/MAX 230 KIAS hold). Frequencies on the AD chart: ATIS 127.85, DLVRY 121.9, GND 121.6/121.65, TWR 118.2/118.05, APP 120.25/125.5."},
+    {"name": "VATJPN public document - airspace classes", "url": "https://vatjpn.org/document/public/prc/300/301", "notes": "Class mapping for Japan. Its speed limit text for control zones (200/160 kt) is outdated after the 2021-12-30 amendment."},
+    {"name": "NAA / PR TIMES 2024年12月 空港運用状況", "url": "https://prtimes.jp/main/html/rd/p/000000819.000004762.html", "notes": "NRT 2024 calendar year: international passenger flights 157,703, cargo 30,069. Total not stated in the excerpt."}
+  ],
+  "airports": {
+    "RJBB": {
+      "name": "Kansai International (KIX)",
+      "runways": [
+        {"id": "06R/24L", "name": "A runway", "lengthM": 3500, "widthM": 60, "ils": "CAT II both ends (per ja.wikipedia)", "verified": true, "source": "https://ja.wikipedia.org/wiki/関西国際空港"},
+        {"id": "06L/24R", "name": "B runway", "lengthM": 4000, "widthM": 60, "ils": "CAT II both ends (per ja.wikipedia)", "verified": true, "source": "https://ja.wikipedia.org/wiki/関西国際空港"}
+      ],
+      "runwayUse": "Since 2025-03-20 (new Kansai flight paths): A runway 06R/24L mainly for ARRIVALS, B runway 06L/24R mainly for DEPARTURES. From 2013 until March 2025 it was the other way round (A = departures, B = arrivals). Wind: 'north wind' ops (runway 06, NE-bound) about 60%, 'south wind' ops (runway 24) about 40% over the last 5-year record. 24-hour airport. New overland routes are used only 06:30-23:00. 23:00-06:00 (06:30) traffic uses sea routes via the Akashi and Kitan straits. At night the two runways are closed alternately for maintenance, so single-runway ops are typical overnight (the second runway removed whole-airport closures; detailed night schedule not verified).",
+      "configs": [
+        {"name": "North wind / East (06) - current (2025-03-20 onward)", "arrRwys": ["06R"], "depRwys": ["06L"], "conditions": "NE-ly wind component. About 60% of the time historically. Daytime routes over Awaji Island used 06:30-23:00.", "verified": true, "source": "https://www.kobeairport.jp/flightmap-kix-itm-ukb/ ; https://web.pref.hyogo.lg.jp/ks06/documents/01_main-doc.pdf"},
+        {"name": "South wind / West (24) - current (2025-03-20 onward)", "arrRwys": ["24L"], "depRwys": ["24R"], "conditions": "SW-ly wind component. About 40% of the time historically.", "verified": true, "source": "https://www.kobeairport.jp/flightmap-kix-itm-ukb/ ; https://web.pref.hyogo.lg.jp/ks06/documents/01_main-doc.pdf"},
+        {"name": "Legacy North wind (06) - 2013 to March 2025", "arrRwys": ["06L"], "depRwys": ["06R"], "conditions": "Historic config, useful for a 'classic' scenario.", "verified": true, "source": "https://ja.wikipedia.org/wiki/関西国際空港"},
+        {"name": "Legacy South wind (24) - 2013 to March 2025", "arrRwys": ["24R"], "depRwys": ["24L"], "conditions": "Historic config.", "verified": true, "source": "https://ja.wikipedia.org/wiki/関西国際空港"},
+        {"name": "Night (approx. 23:00-06:30)", "arrRwys": ["single runway open (the other closed for maintenance)"], "depRwys": ["same runway"], "conditions": "Sea routes via Akashi/Kitan straits only. Which runway is open varies by night.", "verified": false, "source": "Approximation from Hyogo doc (night routes verified) and ja.wikipedia (alternate runway maintenance). Exact night runway schedule not verified."}
+      ],
+      "curfew": null,
+      "operatingHours": "24 hours",
+      "capacityPerHour": {"value": 60, "notes": "Raised from 45/h to about 60/h with the 2025-03-20 airspace and route change. A controller simulator study of the old airspace found a max of 47/h (north wind) and 46/h (south wind). Long-term target 300k movements/yr in the early 2030s.", "verified": true, "source": "https://www.mlit.go.jp/koku/content/001520599.pdf ; Nikkei 2024 (関西国際空港の発着枠3割増で合意 1時間60回)"},
+      "dailyMovements": {"value": 566, "notes": "206,731 movements in 2025 / 365 = about 566/day (international 162,612, domestic 44,119). Daytime peak hours were already hitting 45/h in 2019. The Expo 2025 planning schedule reached 60 in the 12:00 hour.", "verified": true, "source": "https://ja.wikipedia.org/wiki/関西国際空港 ; https://www.mlit.go.jp/koku/content/001520599.pdf"},
+      "frequencies": [
+        {"unit": "Kansai ATIS", "freq": "127.85", "verified": true, "source": "AIP AD chart (yinlei RJBB) + Airband Japan"},
+        {"unit": "Kansai Delivery", "freq": "121.90", "verified": true, "source": "AIP AD chart (yinlei RJBB)"},
+        {"unit": "Kansai Ground (A runway side)", "freq": "121.60", "verified": true, "source": "AIP AD chart lists 121.6/121.65. Side allocation per Airband Japan."},
+        {"unit": "Kansai Ground (B runway side)", "freq": "121.65", "verified": true, "source": "AIP AD chart + Airband Japan"},
+        {"unit": "Kansai Tower (A runway)", "freq": "118.20", "verified": true, "source": "AIP AD chart lists 118.2/118.05. Runway allocation per Airband Japan."},
+        {"unit": "Kansai Tower (B runway)", "freq": "118.05", "verified": true, "source": "AIP AD chart + Airband Japan"},
+        {"unit": "Kansai Approach (main)", "freq": "120.25", "verified": true, "source": "AIP ILS Z RWY06R chart (2012 ed.) lists KANSAI APP 120.25-125.5. Airband Japan marks 120.25 as main."},
+        {"unit": "Kansai Approach / Radar (other)", "freq": "120.45, 125.50, 124.70, 121.15, 120.85, 125.00, 119.75, 124.80, 121.20, 120.40, 127.575", "verified": false, "source": "Airband Japan (sector split not stated; 124.8/120.85 noted for busy periods). 120.45/124.7 are also listed for Itami arrivals."},
+        {"unit": "Kansai Departure (main)", "freq": "119.20", "verified": false, "source": "Airband Japan (also 120.65, 119.50 and shared radar freqs). Itami page notes 119.2 for TIGER-direction departures."},
+        {"unit": "Kansai TCA (VFR advisory)", "freq": "121.10 / 125.30", "verified": false, "source": "Airband Japan"}
+      ],
+      "notes": "Kansai Approach (Kansai Terminal Control at KIX) provides approach/departure radar for KIX, ITM and UKB. Typical altitudes from the (old) AIP ILS Z RWY06R chart: IF ATACK 4,000 ft, FAF ZELDA 3,000 ft (GP 3.0 deg), missed approach climb to 4,000 ft to hold at AKASI. RNAV STARs (old editions) end at fixes like ALLAN/BERRY at or above 4,000 ft. CDO procedures exist (JCAB example: 'Cleared to BERRY via Runway 06L CDO Number Two, descend and maintain 4,000, comply with restrictions'). Post-2025: KIX departures 5,000 ft or above and arrivals 4,000 ft or above over land, with 1,000 ft or more vertical spacing between crossing flows over Awaji."
+    },
+    "RJTT": {
+      "name": "Tokyo International (Haneda, HND)",
+      "runways": [
+        {"id": "16R/34L", "name": "A runway", "lengthM": 3000, "verified": true, "source": "https://ja.wikipedia.org/wiki/東京国際空港"},
+        {"id": "04/22", "name": "B runway", "lengthM": 2500, "verified": true, "source": "https://ja.wikipedia.org/wiki/東京国際空港"},
+        {"id": "16L/34R", "name": "C runway", "lengthM": 3360, "ils": "CAT IIIb (34R per wiki table)", "verified": true, "source": "https://ja.wikipedia.org/wiki/東京国際空港"},
+        {"id": "05/23", "name": "D runway", "lengthM": 2500, "verified": true, "source": "https://ja.wikipedia.org/wiki/東京国際空港"}
+      ],
+      "runwayUse": "Two basic flows by wind: north wind about 60% and south wind about 40% (annual average; strongly seasonal, south wind dominant in summer). Since 2020-03-29 'new flight paths' over central Tokyo raised capacity from 80 to 90 movements per hour. South wind new routes run 15:00-19:00 (about 3 h effective). North wind new routes run 07:00-11:30 and 15:00-19:00 (about 3 h in the afternoon). 23:00-06:00 uses sea routes with a two-runway limit and the runways farthest from land. As a rule civil aircraft do not depart RWY04 or land RWY05.",
+      "configs": [
+        {"name": "1/2 Daytime north wind (normal)", "arrRwys": ["34L", "34R"], "depRwys": ["05", "34R"], "conditions": "Good WX: ILS X RWY34L + HIGHWAY VISUAL RWY34R. Otherwise ILS Z RWY34L / ILS Z RWY34R.", "verified": true, "source": "https://www.ntrack.mlit.go.jp/appx/unkoujoukyou20221006.pdf"},
+        {"name": "3/4 Daytime north wind - new routes (07:00-11:30 and about 3 h within 15:00-19:00)", "arrRwys": ["34L", "34R"], "depRwys": ["05", "34R"], "conditions": "Same runways, but RWY34R departures use the new northbound route (along the Arakawa river) independent of D-runway departures. About 22 departures/h from C runway.", "verified": true, "source": "https://www.ntrack.mlit.go.jp/appx/unkoujoukyou20221006.pdf ; https://www.mlit.go.jp/common/001302400.pdf ; Aviation Wire"},
+        {"name": "5/6 Daytime south wind (normal; 06:00-15:00, 19:00-23:00)", "arrRwys": ["22", "23"], "depRwys": ["16L", "16R"], "conditions": "Good WX: simultaneous LDA W RWY22 / LDA W RWY23. Otherwise ILS RWY22 / ILS Z RWY23.", "verified": true, "source": "https://www.ntrack.mlit.go.jp/appx/unkoujoukyou20221006.pdf"},
+        {"name": "7/8 Daytime south wind - new routes over central Tokyo (about 3 h within 15:00-19:00)", "arrRwys": ["16L", "16R"], "depRwys": ["22", "16R"], "conditions": "Good WX: simultaneous RNP RWY16L / RNP RWY16R. Otherwise ILS RWY16L / ILS RWY16R. Approx. A-runway arrivals 14/h, C-runway arrivals 30/h, B-runway (22) departures 20/h. D runway not used.", "verified": true, "source": "https://www.ntrack.mlit.go.jp/appx/unkoujoukyou20221006.pdf ; Aviation Wire summary"},
+        {"name": "9 Night north wind (23:00-06:00)", "arrRwys": ["34R (primary)", "34L (secondary)"], "depRwys": ["05", "16L (primary)", "16R (secondary)", "34R (tertiary)"], "conditions": "Over-sea routes. NIGHT ARRIVAL STARs. Idle reverse thrust on 34L/22.", "verified": false, "source": "https://squawk.id/vatsim-commentary/for-all-members/airport/rjtt/midnight-operation/ (VATSIM). MLIT confirms sea routes and the 2-runway principle only."},
+        {"name": "9 Night south wind (23:00-06:00)", "arrRwys": ["23 (primary)", "16L (secondary)", "22 (tertiary)"], "depRwys": ["05", "16L (primary)", "16R (secondary)", "34R (tertiary)"], "conditions": "Over-sea routes.", "verified": false, "source": "squawk.id (VATSIM)"}
+      ],
+      "curfew": null,
+      "operatingHours": "24 hours (night ops restricted to sea routes; some runway closures 23:00-06:30 for maintenance)",
+      "capacityPerHour": {"value": 90, "notes": "Movements (arr+dep) per hour with the 2020 new routes. 80/h before. Annual slots about 490k.", "verified": true, "source": "https://www.mlit.go.jp/common/001302400.pdf"},
+      "dailyMovements": {"value": 1300, "notes": "Approximation: annual movements about 455k (ja.wikipedia), with 2025 reported at about the 490k slot ceiling (search summary, not confirmed in a primary source). That is about 1,250-1,340/day.", "verified": false, "source": "https://ja.wikipedia.org/wiki/東京国際空港"},
+      "frequencies": [
+        {"unit": "Tokyo ATIS (Haneda)", "freq": "128.80", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Delivery", "freq": "121.825 / 121.875", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Ground (T1 area)", "freq": "121.70", "verified": false, "source": "Airband Japan. JCAB phraseology example: 'Monitor Ground 121.7'."},
+        {"unit": "Tokyo Ground (T2 area)", "freq": "118.225", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Ground (T3 / international)", "freq": "121.625", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Ground (D runway area)", "freq": "121.975", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Tower (A runway)", "freq": "118.10", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Tower (B runway)", "freq": "118.575", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Tower (C runway / RWY23)", "freq": "124.35", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Tower (D runway)", "freq": "118.725", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Approach (Haneda, main / first contact from west)", "freq": "119.10", "verified": true, "source": "Freq listed by Airband Japan. 'Contact Tokyo Approach 119.1' appears verbatim in the JCAB procedures manual. Sector role per enthusiast blogs (unverified)."},
+        {"unit": "Tokyo Approach (Haneda, arrivals from north)", "freq": "119.40", "verified": false, "source": "Airband Japan + enthusiast blogs"},
+        {"unit": "Tokyo Radar / Approach (Haneda feeder/final)", "freq": "126.50 (also 119.7, 125.4, 124.0)", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Departure (Haneda, westbound)", "freq": "126.00", "verified": false, "source": "Airband Japan + enthusiast blogs"},
+        {"unit": "Tokyo Departure (Haneda, northbound)", "freq": "120.80", "verified": false, "source": "Airband Japan + enthusiast blogs"},
+        {"unit": "Tokyo Departure (other)", "freq": "127.60", "verified": false, "source": "Airband Japan"}
+      ],
+      "notes": "Callsigns: 'Tokyo Delivery/Ground/Tower' at Haneda; Tokyo Approach/Departure is the Tokyo terminal radar (Haneda + Narita sectors). Runway interactions (MLIT FAQ): B-arrivals crossing A runway block A departures; D-arrival go-around conflicts with A/C departures, so departures wait until the D arrival has landed; C departures and D departures conflict on northbound routes (fixed by the 2020 route). Simultaneous LDA approaches to 22/23 and simultaneous RNP approaches to 16L/16R are special procedures in the JCAB manual (Part V). New south-wind arrival paths cross central Tokyo at roughly 3,000-4,000 ft (MLIT diagrams show 3,400/3,800 ft labels near the final segments). Noise abatement: delayed-flap approach 22:00-07:00."
+    },
+    "RJAA": {
+      "name": "Narita International (NRT)",
+      "runways": [
+        {"id": "16R/34L", "name": "A runway", "lengthM": 4000, "verified": true, "source": "Airband Japan / JAC 2024 data"},
+        {"id": "16L/34R", "name": "B runway", "lengthM": 2500, "notes": "Extension to 3,500 m (northward by 1,000 m) under construction", "verified": true, "source": "JAC 2024 data; NAA"},
+        {"id": "C (planned)", "name": "C runway", "lengthM": 3500, "notes": "New third runway, target completion end of March 2029", "verified": true, "source": "sky-budget/NAA"}
+      ],
+      "runwayUse": "Both runways are used for arrivals and departures. Since 2011-10-20 NRT has run simultaneous parallel take-off and landing ops (both runways independently mixed at peaks). The JCAB manual has a Narita-specific 'simultaneous parallel departure' procedure with WAM monitoring, a DNTZ 610 m wide (34L/34R: from 600 m past the 34L start of roll to 14 NM; 16R/16L: to 21 NM) and RNAV initial waypoint check in the take-off clearance. North vs south wind split not found in an official source.",
+      "configs": [
+        {"name": "North wind (34)", "arrRwys": ["34L", "34R"], "depRwys": ["34L", "34R"], "conditions": "Mixed mode on both runways. Arrivals may be held at 4,000-5,000 ft over land (instead of 6,000 ft) when congested.", "verified": false, "source": "Mixed-mode use per NAA (simultaneous parallel take-off/landing). Exact per-runway arr/dep preference not verified."},
+        {"name": "South wind (16)", "arrRwys": ["16R", "16L"], "depRwys": ["16R", "16L"], "conditions": "Mixed mode. Southbound departures may delay their turn until 6,000 ft and clear of noise areas (about 13 km for A, 10 km for B) when congested.", "verified": false, "source": "NAA 飛行コース page (congestion procedures verified; per-runway split not verified)"}
+      ],
+      "curfew": {"current": "A runway 06:00-24:00, B runway 06:00-23:00 (B runway limited to 10 flights in the 22:00 hour). Closed 00:00-06:00. A-runway hours extended to 24:00 from 2019-10-27.", "future": "After C runway opens (target FY2028 end / March 2029): 'slide operation' with different hours per runway, 7 h quiet time under each path, airport-wide 05:00-00:30.", "verified": true, "source": "https://www.narita-kinoukyouka.jp/document/250124_20_chiba.pdf ; https://sky-budget.com/2025/04/13/narita-airport-3rd-runway/"},
+      "capacityPerHour": {"value": 72, "notes": "Hourly cap 72 per NAA virtual-schedule chart (values 72 shown) and search summary of research papers (72 standard, 76 possible with improvements, 84 max). Annual slots 340k from 2025-10-26 (was 300k). 500k after C runway.", "verified": false, "source": "NAA 2025-01-24 PDF (chart) ; https://www.jstage.jst.go.jp/article/jscejipm/72/5/72_I_1037/_pdf"},
+      "dailyMovements": {"value": 670, "notes": "Approximation: about 245k movements/yr in FY2024 (search summary), i.e. about 670/day. 2018 FY was 256,821. 2024 CY international passenger flights 157,703 + cargo 30,069. Afternoon peak 14:00-18:00 at the hourly cap. Morning 09-11 and 20:00 got the extra slots in the 340k plan.", "verified": false, "source": "NAA 運用状況 / PR TIMES ; NAA 2025-01-24 PDF"},
+      "frequencies": [
+        {"unit": "Narita ATIS", "freq": "128.25", "verified": false, "source": "Airband Japan"},
+        {"unit": "Narita Delivery", "freq": "121.90 (also 121.65)", "verified": false, "source": "Airband Japan"},
+        {"unit": "Narita Ground (A runway / T1)", "freq": "121.85", "verified": false, "source": "Airband Japan"},
+        {"unit": "Narita Ground (B runway / T2-T3)", "freq": "121.95", "verified": true, "source": "JCAB manual example: 'Japanair 3051, runway34L, taxi via B, hold short of S5, contact ground 121.95' (Narita Ground). Allocation per Airband Japan."},
+        {"unit": "Narita Tower", "freq": "118.20 (primary), 118.35 (A runway)", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Approach (Narita)", "freq": "124.40 (primary); also 121.275, 125.20, 125.80, 127.70", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Departure (Narita)", "freq": "124.20 (primary); 119.60 (south); 120.60, 125.525, 127.50 (north)", "verified": false, "source": "Airband Japan"},
+        {"unit": "Tokyo Radar (Narita area)", "freq": "120.20", "verified": false, "source": "Airband Japan"}
+      ],
+      "notes": "Runway centreline spacing about 2,500 m (not verified here) exceeds the 1,310 m needed for simultaneous parallel ILS. Narita arrivals/departures are worked by Tokyo Approach/Departure Narita sectors (Tokyo terminal control). The JCAB example 'Resume own navigation, 15 miles northwest of PAPAS, turn left heading 160 to intercept Narita VOR 137 Radial' is from the manual."
+    },
+    "RJOO": {
+      "name": "Osaka International (Itami, ITM)",
+      "runways": [
+        {"id": "14L/32R", "name": "A runway", "lengthM": 1828, "widthM": 45, "use": "Smaller aircraft (regional jets, turboprops)", "verified": true, "source": "https://ja.wikipedia.org/wiki/大阪国際空港"},
+        {"id": "14R/32L", "name": "B runway", "lengthM": 3000, "widthM": 60, "use": "Large jets (B777/767/787/A320 etc.). Only runway with ILS (32L).", "verified": true, "source": "https://ja.wikipedia.org/wiki/大阪国際空港"}
+      ],
+      "runwayUse": "Normally '32 operation': arrivals from the south on ILS 32L (jets) and departures northwest on 32L (jets) / 32R (small aircraft). '14 operation' (SE-bound) is rare, reportedly about 3% (enthusiast source). In 14 ops arrivals fly the ILS 32L course and then break right, circling to land 14R/14L (the 'Itami curve').",
+      "configs": [
+        {"name": "32 operation (normal)", "arrRwys": ["32L", "32R (small aircraft)"], "depRwys": ["32L", "32R (small aircraft)"], "conditions": "Default, vast majority of time.", "verified": true, "source": "https://ja.wikipedia.org/wiki/大阪国際空港 (runway roles); frequency of use from enthusiast blogs"},
+        {"name": "14 operation", "arrRwys": ["14R (circling from ILS 32L)", "14L"], "depRwys": ["14R", "14L"], "conditions": "Strong SE winds (typhoons etc.). About 3% (unverified).", "verified": false, "source": "https://ja.wikipedia.org/wiki/大阪国際空港 ; kansai-sanpo.com (approx. 3%)"}
+      ],
+      "curfew": {"hours": "Operations 07:00-21:00 only (curfew 21:00-07:00)", "verified": true, "source": "MLIT 2022 PDF (2005 Kansai 3-airport agreement) ; ja.wikipedia"},
+      "capacityPerHour": null,
+      "slotLimit": {"value": "370 movements/day (200 jet slots + 170 low-noise aircraft slots)", "verified": true, "source": "https://www.mlit.go.jp/koku/content/001520599.pdf ; ja.wikipedia"},
+      "dailyMovements": {"value": 378, "notes": "137,871 movements in 2023 per ja.wikipedia (about 378/day; can slightly exceed 370 because of non-scheduled flights; 370 is the scheduled slot cap).", "verified": true, "source": "https://ja.wikipedia.org/wiki/大阪国際空港"},
+      "frequencies": [
+        {"unit": "Osaka ATIS (Itami)", "freq": "128.60", "verified": false, "source": "Airband Japan"},
+        {"unit": "Osaka Delivery (Itami)", "freq": "118.80", "verified": false, "source": "Airband Japan"},
+        {"unit": "Osaka Ground (Itami)", "freq": "121.70", "verified": false, "source": "Airband Japan"},
+        {"unit": "Osaka Tower (Itami)", "freq": "118.10", "verified": false, "source": "Airband Japan. Callsign 'Osaka Tower' is from memory, not verified."},
+        {"unit": "Kansai Approach (Itami arrivals)", "freq": "120.45 / 124.70", "verified": false, "source": "Airband Japan"},
+        {"unit": "Kansai Departure (Itami departures)", "freq": "119.50 / 119.20 (TIGER direction)", "verified": false, "source": "Airband Japan"}
+      ],
+      "notes": "Approach/departure radar is provided by Kansai Approach/Departure (at KIX). Airband Japan also lists a runway assignment by MTOW (34,500 kg for take-off, 79,243 kg for landing), but its runway labels appear inconsistent with Wikipedia, so it was not used."
+    },
+    "RJBE": {
+      "name": "Kobe (UKB)",
+      "runways": [
+        {"id": "09/27", "lengthM": 2500, "widthM": 60, "verified": true, "source": "Airband Japan; MLIT 2022 PDF"}
+      ],
+      "runwayUse": "Single runway 09/27. Operating hours 07:00-23:00 (extended from 22:00 in March 2020). Under the 2025 Kansai route revision, Kobe departures crossing under KIX arrivals are capped at 3,000 ft (KIX arrivals 4,000 ft) near the Akashi strait/Awaji, with the altitude-restriction points set over the sea.",
+      "configs": [
+        {"name": "West (27)", "arrRwys": ["27"], "depRwys": ["27"], "conditions": "Wind-dependent; split not found.", "verified": false, "source": "Not found"},
+        {"name": "East (09)", "arrRwys": ["09"], "depRwys": ["09"], "conditions": "Wind-dependent; split not found.", "verified": false, "source": "Not found"}
+      ],
+      "curfew": {"hours": "Operations 07:00-23:00", "verified": true, "source": "MLIT 2022 PDF; Airband Japan"},
+      "capacityPerHour": null,
+      "slotLimit": {"value": "Domestic max 80/day historically, expanded to 120/day (agreed 2022, from 2025). International: charters from Expo 2025, scheduled international up to 40/day around 2030.", "verified": true, "source": "https://www.mlit.go.jp/koku/content/001520599.pdf (12th Kansai 3-airport council summary)"},
+      "dailyMovements": {"value": 80, "notes": "About 80/day (cap) in 2022; up to 120/day domestic after 2025 expansion.", "verified": false, "source": "MLIT 2022 PDF"},
+      "frequencies": [
+        {"unit": "Kobe ATIS", "freq": "128.075", "verified": false, "source": "Airband Japan"},
+        {"unit": "Kobe Ground", "freq": "122.075", "verified": false, "source": "Airband Japan"},
+        {"unit": "Kobe Tower", "freq": "118.50", "verified": false, "source": "Airband Japan"},
+        {"unit": "Kansai Radar (Kobe area)", "freq": "121.15 / 120.85 / 125.50", "verified": false, "source": "Airband Japan"},
+        {"unit": "Kansai TCA", "freq": "121.10 / 125.30", "verified": false, "source": "Airband Japan"}
+      ],
+      "notes": "UKB is inside the Kansai terminal airspace; arrivals/departures are radar-controlled by Kansai Approach/Radar."
+    }
+  },
+  "acc": {
+    "notes": "Airspace reorganisation (上下分離, vertical split): the en-route airspace is split at 33,500 ft. Fukuoka ACC handles all high-altitude (above 33,500 ft) and oceanic airspace. Tokyo ACC (Tokorozawa) handles low-altitude airspace in east Japan (Hokkaido to Kanto, part of Tokai, and southern Kinki incl. the Kii Peninsula). Kobe ACC handles low-altitude airspace in west Japan (west of Hokuriku/Kamikochi, excluding the Kii Peninsula), including the former Naha area. Timeline: Naha ACC abolished 2018 (moved to Kobe). West Japan split started FY2022. East Japan split from 2023, completed March 2025. Sapporo ACC airspace split in March 2024 (upper to Fukuoka), lower moved to Tokyo ACC in October 2024, and Sapporo ACC abolished. So there are now 3 ACCs: Tokyo (15-17 sectors), Kobe (11), Fukuoka (22). The Kansai lower en-route airspace (feeding KIX/ITM/UKB) is Kobe ACC (sector N44 'southern Gifu to Kansai'). Arrivals from the south/east over the Kii Peninsula are in Tokyo ACC lower airspace. Kanto lower airspace is Tokyo ACC. Callsign is '<Tokyo/Kobe/Fukuoka> Control'. Below the terminal areas: Tokyo Approach/Departure (Haneda+Narita), Kansai Approach/Departure (KIX+ITM+UKB).",
+    "sectors": [
+      {"name": "Kobe Control N43", "freq": "132.45", "area": "Hokuriku, Nagano", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部 (as of Apr 2025) + Airband Japan"},
+      {"name": "Kobe Control N44", "freq": "123.90", "area": "Southern Gifu through Kansai (Kansai area lower en-route)", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N47", "freq": "133.55", "area": "Northern Kinki", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N48", "freq": "133.80", "area": "Eastern San'in", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N49", "freq": "132.70", "area": "Bisan Strait (Okayama/Kagawa)", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N50", "freq": "127.15", "area": "Shikoku Pacific side (relevant to KIX arrivals from the SW)", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N51", "freq": "132.50", "area": "Western Chugoku", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N52", "freq": "135.65", "area": "Shikoku/Kyushu Seto Inland Sea coast", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N53", "freq": "118.90", "area": "Northern Kyushu", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N54", "freq": "133.85", "area": "Southern Kyushu", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Kobe Control N55", "freq": "132.35", "area": "Satsunan Islands to northern Okinawa", "verified": true, "source": "ja.wikipedia 神戸航空交通管制部"},
+      {"name": "Tokyo Control T25", "freq": "133.35", "area": "Chita (FL285 and above per one enthusiast list)", "verified": true, "source": "ja.wikipedia 東京航空交通管制部"},
+      {"name": "Tokyo Control T30", "freq": "127.50", "area": "Not published in sources found", "verified": false, "source": "ja.wikipedia / Airband Japan (freq only)"},
+      {"name": "Tokyo Control T31", "freq": "119.30", "area": "Not published in sources found", "verified": false, "source": "ja.wikipedia / Airband Japan (freq only)"},
+      {"name": "Tokyo Control T32", "freq": "124.50", "area": "Not published in sources found", "verified": false, "source": "ja.wikipedia / Airband Japan (freq only)"},
+      {"name": "Tokyo Control T33", "freq": "132.30", "area": "Unknown (freq formerly Joetsu sector T01)", "verified": false, "source": "Freq from ja.wikipedia. Former-sector link is an inference from older lists."},
+      {"name": "Tokyo Control T34", "freq": "118.90", "area": "Unknown (freq formerly Tohoku sector T02)", "verified": false, "source": "Inference"},
+      {"name": "Tokyo Control T35", "freq": "124.10", "area": "Unknown (freq formerly Kanto North T03)", "verified": false, "source": "Inference"},
+      {"name": "Tokyo Control T36", "freq": "134.00", "area": "Not published", "verified": false, "source": "ja.wikipedia / Airband Japan"},
+      {"name": "Tokyo Control T38", "freq": "120.50", "area": "Unknown (freq formerly Kanto West T12)", "verified": false, "source": "Inference"},
+      {"name": "Tokyo Control T39", "freq": "132.10", "area": "Unknown (freq formerly Musashi T13)", "verified": false, "source": "Inference"},
+      {"name": "Tokyo Control T40", "freq": "123.70", "area": "Unknown (freq formerly Kanto South A T09 - Haneda arrivals from SW)", "verified": false, "source": "Inference"},
+      {"name": "Tokyo Control T41", "freq": "133.70", "area": "Unknown (freq formerly Shonan T14)", "verified": false, "source": "Inference"},
+      {"name": "Tokyo Control T42", "freq": "125.90", "area": "Unknown (freq formerly Kanto South B T10)", "verified": false, "source": "Inference"},
+      {"name": "Tokyo Control T43", "freq": "132.45", "area": "Not published", "verified": false, "source": "ja.wikipedia"},
+      {"name": "Tokyo Control T44", "freq": "123.90", "area": "Not published", "verified": false, "source": "ja.wikipedia"},
+      {"name": "Tokyo Control T45", "freq": "125.70", "area": "Not published", "verified": false, "source": "ja.wikipedia / Airband Japan"},
+      {"name": "Tokyo Control T46", "freq": "133.50", "area": "Not published", "verified": false, "source": "ja.wikipedia / Airband Japan"}
+    ]
+  },
+  "separation": {
+    "radar": {
+      "terminal": {"value": "3 NM", "rule": "Both targets from airport surveillance radar (ASR) within 40 NM of the radar site (not supplementary targets), or from airport WAM.", "verified": true, "source": "JCAB 管制業務処理規程 (IV)6(4)a"},
+      "enroute": {"value": "5 NM", "rule": "All other cases.", "verified": true, "source": "JCAB 管制業務処理規程 (IV)6(4)a(b)"},
+      "boundaryBuffer": {"value": "1.5 NM (3 NM-radar) / 2.5 NM (5 NM-radar) from an adjacent sector boundary when the neighbour also applies radar separation; 3/5 NM if not", "verified": true, "source": "JCAB (IV)6(6)"},
+      "arrivalVsDeparture": {"value": "2 NM radar separation between an arrival and a departure, and the full radar minimum within 1 minute after take-off", "verified": true, "source": "JCAB (IV)6(9)a"},
+      "initialDepartureSpacing": {"value": "Successive departures (same runway, or parallels under 760 m apart) on routes diverging at least 15 deg: at least 1 NM radar separation at the divergence point, if the follower will be radar-identified within 1 NM of the runway end. Simultaneous take-off allowed from parallels 760 m or more apart with routes diverging at least 15 deg.", "verified": true, "source": "JCAB (IV)6(8)"}
+    },
+    "vertical": {
+      "value": "1,000 ft up to FL290; 2,000 ft above FL290; 1,000 ft between RVSM-approved aircraft in RVSM airspace (FL290-FL410); 2,000 ft RVSM vs non-RVSM. 500 ft between IFR and VFR in PCA (special control airspace).",
+      "verified": true,
+      "source": "JCAB 管制業務処理規程 (II)2(2)a"
+    },
+    "wakeTurbulenceRadar": {
+      "categoryTableNM": {"J>H": 5, "J>M": 7, "J>L": 8, "H>H": 4, "H>M": 5, "H>L": 6, "M>L": 5},
+      "categoryNotes": "ICAO categories J (Super), H, M, L. The J>H value was reduced in the 2020 revision. Applies when the follower is at the same altitude or less than 1,000 ft below and in trail, or when using the same runway or parallels under 760 m apart (arrivals until the leader crosses the threshold, unless visual approach).",
+      "groupTableNM_RECAT": {"A>B": 4, "A>C": 5, "A>D": 5, "A>E": 6, "A>F": 6, "A>G": 8, "B>B": 3, "B>C": 4, "B>D": 4, "B>E": 5, "B>F": 5, "B>G": 7, "C>D": 3, "C>E": 3.5, "C>F": 3.5, "C>G": 6, "D>G": 4, "E>G": 4},
+      "groupExamples": {"A": "A388", "B": "A359, B788 (also B77W/B744 class)", "C": "B763, MD11", "D": "A320, B738", "E": "DH8D, E190", "F": "CRJ7, E170", "G": "C680, SF34"},
+      "groupNotes": "Wake groups A-G (ICAO PANS-ATM 2020, RECAT-EU/1.5-style) are used in Japan only at Narita and Haneda (requires a system that shows the group on the controller display). Trial began 2020-03-26, formal from 2020-11-05. Pairs not listed fall back to the radar minimum (3 NM in terminal). Since the revision 'Heavy'/'Super' must be appended to callsigns of category H/J aircraft.",
+      "verified": true,
+      "source": "JCAB 管制業務処理規程 (IV)6(4)b ; ATCAJ R/T Meeting Vol.025"
+    },
+    "wakeTurbulenceDepartureTime": {
+      "categoryTable": {"J>H": "2 min", "J>M/L": "3 min", "H>M/L": "2 min"},
+      "groupTableSeconds": {"A>B": 100, "A>C": 120, "A>D": 140, "A>E/F": 160, "A>G": 180, "B>D": 100, "B>E/F": 120, "B>G": 140, "C>D": 80, "C>E/F": 100, "C>G": 120, "D>G": 120, "E>G": 100},
+      "notes": "Time from the leader starting its take-off roll to take-off clearance for the follower (same direction), unless the terminal radar wake distances are applied.",
+      "verified": true,
+      "source": "JCAB 管制業務処理規程 (III)3(2)b"
+    },
+    "runway": {
+      "value": "A following departure may not start its roll until the preceding departure has crossed the runway end or turned away, or the preceding arrival has vacated (crossed the holding-position marking, or cleared the runway edge if it will cross without delay).",
+      "verified": true,
+      "source": "JCAB 管制業務処理規程 (III)3(2)a"
+    },
+    "parallelRunways": {
+      "simultaneousParallelILS": "Allowed when centrelines are at least 1,310 m (4,300 ft) apart, straight-in only, missed approach paths diverging at least 30 deg, NTZ displayed and monitored by a separate controller per localizer, with tower-frequency override. 3 NM radar or 1,000 ft vertical until the higher aircraft joins the glide path. Join the localizer at least 2 NM outside the approach gate, intercept angle optimum 20 deg / max 30 deg. ATIS/ATC: 'SIMULTANEOUS PARALLEL ILS APPROACHES TO RUNWAY 34 LEFT AND RIGHT ARE IN PROGRESS'.",
+      "simultaneousTakeoffLanding": "Landing on one parallel and departing the other is allowed if the departure path diverges at least 30 deg from the missed approach path: A-type parallels 760 m or more apart, B-type parallels 1,310 m or more apart.",
+      "HND": "Special procedures: simultaneous LDA approaches RWY22/RWY23 (3 NM or 1,000 ft until the RWY22 FAF, NTZ 610 m wide) and simultaneous RNP RWY16L/16R approaches (no radar separation between the two streams).",
+      "NRT": "Simultaneous parallel departures with Narita WAM and DNTZ. Take-off clearance prefixed 'RNAV to <first waypoint>'. Simultaneous parallel landing/take-off since 2011.",
+      "verified": true,
+      "source": "JCAB 管制業務処理規程 (IV)8-4, (IV)6(9), Part V"
+    }
+  },
+  "altimetry": {
+    "transitionAltitude": {"value": "14,000 ft", "notes": "Altitudes of 14,000 ft and above are normally expressed as flight levels; QNH is used up to 13,000 ft in practice (14,000 ft is called FL140).", "verified": true, "source": "squawk.id (quoting 管制方式基準); search summary of Japanese sources"},
+    "transitionLevel": {"value": "FL140 when QNH is 29.92 inHg or higher; FL150 for 29.91-28.92; FL160 for 28.91-27.92 (lowest usable FL table)", "notes": "Some Japanese sources simply state 'TL normally FL150'.", "verified": true, "source": "squawk.id 14,000ft-or-FL140"},
+    "qnhUnits": {"value": "inHg, read as four digits, e.g. 'QNH 2984', 'QNH3002'", "notes": "A Japan-specific item that a game should reproduce. hPa is not used in ATC instructions.", "verified": true, "source": "JCAB manual phraseology examples ('Japanair 91, runway16L, QNH 2984')"},
+    "typicalApproachAltitudes": {"value": "KIX ILS Z RWY06R (old chart): IF 4,000 ft, FAF 3,000 ft, GP 3.0 deg. KIX new arrival restriction 4,000 ft over land. HND final approach altitudes typically 3,000-4,000 ft on the base/final legs (new route diagrams show 3,000-5,000 ft). JCAB examples: 'Fly heading 090 vector to final approach course, maintain 6,000', 'descend via STAR to altitude 2,000'.", "verified": false, "source": "AIP chart (yinlei RJBB, 2012 ed.), MLIT HND diagrams, JCAB manual. Treat as approximate for gameplay."}
+  },
+  "speedControl": {
+    "legalLimit": {"value": "250 kt IAS in control zones and in approach control areas at or below 10,000 ft", "notes": "Not a blanket 'below 10,000 ft everywhere' rule; it applies in 管制圏 + 進入管制区 at or below 10,000 ft. The old 200 kt (turbine) / 160 kt (piston) limit at or below 3,000 ft in control zones was abolished on 2021-12-30. ATC may authorise more only for hijack/medical emergencies ('maintain 300kts or less'). Pilots may exceed for safety and should advise, e.g. 'our climb speed 280kts due to performance'.", "verified": true, "source": "ATCAJ R/T Meeting Vol.031 ; 航空法施行規則 第179条"},
+    "minimumAssignableSpeeds": {
+      "allAircraftAtOrAbove10000ft": "250 kt (or equivalent Mach)",
+      "jetDepartureBelow10000ft": "230 kt",
+      "jetArrivalMoreThan20NMFromThreshold": "210 kt",
+      "jetArrivalWithin20NM": "170 kt",
+      "propArrivalMoreThan20NM": "200 kt",
+      "propArrivalWithin20NMAndDepartures": "150 kt",
+      "maxReductionPerInstructionWithin20NM": "20 kt (as a rule)",
+      "minimumCleanSpeedNote": "Jet minimum clean speed is usually about 220 kt below FL150",
+      "verified": true,
+      "source": "JCAB 管制業務処理規程 (IV)9(5)"
+    },
+    "otherRules": {"value": "IAS in multiples of 10 kt; Mach (0.01 steps) may be used at FL250 and above. No specific-speed assignment on RF legs. For RNP/RNP AR approaches, do not assign speeds that would exceed 210 kt at procedure waypoints. Speed control ends automatically on hold, 'descend via STAR', approach clearance, or 5 NM from touchdown on a radar approach. Phrases: 'RESUME PUBLISHED SPEED' / 'RESUME NORMAL SPEED'.", "verified": true, "source": "JCAB (IV)9"},
+    "typicalApproachProfile": {"value": "Typical game profile: 250 kt below 10,000 ft, 210-220 kt on downwind/intermediate, 180 kt on base/intercept, 160 kt to 5 NM final (JCAB example: 'Cleared for ILS runway 34L approach, maintain 160 knots until 5 miles on final'). Holding/missed-approach legs at KIX charted MAX 230 KIAS.", "verified": false, "source": "160 kt to 5 NM example verified in the JCAB manual. 210/180 steps are common practice consistent with the 210/170 minima but not a published Japanese standard."}
+  },
+  "phraseology": [
+    {"situation": "Frequency change / handoff", "example": "Contact Tokyo Approach 119.1. / Contact Tower. / Monitor Ground 121.7. / Contact Fukuoka Control 135.3 at BOMAP.", "source": "JCAB 管制業務処理規程 (verbatim examples)"},
+    {"situation": "IFR clearance (delivery)", "example": "All Nippon 2142 cleared to Narita Airport via Oguni Two Departure Oita Transition, flight planned route, maintain FL370. / Jai ocean 151 cleared to Naha Airport via Nasu Two Departure, flight planned route, maintain 12,000, expect FL280.", "source": "JCAB manual"},
+    {"situation": "Taxi (with frequency change)", "example": "Japanair 3051, runway34L, taxi via B, hold short of S5, contact ground 121.95.", "source": "JCAB manual (Narita example)"},
+    {"situation": "Taxi info with QNH (inHg)", "example": "Japanair 91, runway16L, QNH 2984.", "source": "JCAB manual"},
+    {"situation": "Line up and wait (intersection)", "example": "Japanair 926, runway 36 at E8, line up and wait.", "source": "JCAB manual"},
+    {"situation": "Take-off clearance", "example": "All Nippon 40, wind 360 at 12, runway32L, cleared for take-off.", "source": "JCAB manual"},
+    {"situation": "Take-off clearance - Narita simultaneous parallel departure", "example": "All Nippon 10, RNAV to ASPEN, wind 160 at 5, runway 16R, cleared for take-off.", "source": "JCAB manual (V)2"},
+    {"situation": "Cancel take-off", "example": "Hold position, cancel take-off clearance, arrival traffic going around.", "source": "JCAB manual"},
+    {"situation": "Hold short with traffic", "example": "ANA2147, hold short of runway16R. Traffic 2 miles on final.", "source": "JCAB manual"},
+    {"situation": "Climb via SID / direct", "example": "Recleared direct TAURA, climb via SID to 13,000. / Resume own navigation direct KAMAT, climb via SID to FL180.", "source": "JCAB manual"},
+    {"situation": "Descent via STAR", "example": "Cleared via DAIYA arrival, descend via STAR to altitude 2,000. / Cleared to LAKES via LAKES Arrival, descend via STAR to 6,000.", "source": "JCAB manual"},
+    {"situation": "Descend and maintain", "example": "Cleared to KAIHO via UTIBO Y108, descend and maintain 10,000. / Cleared via ENSYU Arrival, descend and maintain FL190.", "source": "JCAB manual"},
+    {"situation": "CDO (KIX-style)", "example": "Cleared to BERRY via Runway 06L CDO Number Two, descend and maintain 4,000, comply with restrictions. / Cancel CDO due to traffic. Descend and maintain FL160.", "source": "JCAB manual"},
+    {"situation": "Radar vectors", "example": "Turn right heading 220 vector to ILS runway 34R final approach course. / Fly heading 070 vector for spacing. / Cancel CDO. Fly heading 090 vector to final approach course, maintain 6,000.", "source": "JCAB manual"},
+    {"situation": "Approach clearance with speed", "example": "Cleared for ILS runway 34L approach, maintain 160 knots until 5 miles on final.", "source": "JCAB manual"},
+    {"situation": "Approach clearance on STAR", "example": "Descend via STAR to 4,600. Cleared for approach. / Maintain 6,000 until passing SANGO, then descend via STAR to altitude 2,000. Cleared for approach.", "source": "JCAB manual"},
+    {"situation": "Haneda HIGHWAY visual (34R)", "example": "Report \"HIGHWAY\" in sight. ... Cleared \"HIGHWAY VISUAL RUNWAY 34R\" approach.", "source": "JCAB manual"},
+    {"situation": "Visual approach following traffic", "example": "Traffic, 12 o'clock 8 miles westbound B767. ... Follow the traffic, cleared visual approach runway 22.", "source": "JCAB manual"},
+    {"situation": "Speed control", "example": "Reduce speed to 180 knots. / Reduce speed by twenty knots. / Reduce to minimum clean speed. / Reduce speed to 210 knots, then descend and maintain 6,000. / Maintain Mach .80, transit to 280 knots. / Resume normal speed.", "source": "JCAB manual (IV)9 (templates; 180/210/6,000 values filled in for illustration)"},
+    {"situation": "Landing clearance", "example": "Japanair 327, runway34, cleared to land, wind 360 at 15. / All Nippon 68, runway23, cleared to land, wind 220 at 10, preceding B777 2 miles ...", "source": "JCAB manual (note: Japan says runway first, then 'cleared to land', then wind)"},
+    {"situation": "Go-around", "example": "Japanair 306, go around, execute missed approach, runway closed due to obstruction.", "source": "JCAB manual"},
+    {"situation": "Holding", "example": "Hold north of KASMI on Choshi VORTAC 347 radial 7 mile leg, left turns.", "source": "JCAB manual"},
+    {"situation": "Wake caution", "example": "Caution wake turbulence from arriving B777 3 miles on final.", "source": "JCAB manual"},
+    {"situation": "Simultaneous approaches ATIS/ATC", "example": "SIMULTANEOUS PARALLEL ILS APPROACHES TO RUNWAY 34 LEFT AND RIGHT ARE IN PROGRESS. / SIMULTANEOUS LDA APPROACHES TO RUNWAY22 AND RUNWAY23 ARE IN PROGRESS.", "source": "JCAB manual"},
+    {"situation": "Breakout (NTZ)", "example": "TRAFFIC ALERT, <callsign>, TURN LEFT IMMEDIATELY, HEADING <number>, CLIMB AND MAINTAIN <altitude>. / Japanair 959, traffic alert, Japanair 959, turn right immediately, heading 010, maintain 4,000.", "source": "JCAB manual"},
+    {"situation": "Radar handoff (controller-controller)", "example": "Handoff, a target 15 miles north of MUCRY is Jai Ocean 151, descending to 10,000 leaving FL180.", "source": "JCAB manual"},
+    {"situation": "Speed above limit (pilot-initiated)", "example": "PILOT: Tokyo departure, Nippon Cargo 110, our climb speed 280kts due to performance. ATC: Nippon Cargo 110, roger.", "source": "ATCAJ R/T Meeting Vol.031"},
+    {"situation": "Handoff chain (typical)", "example": "Departure: Delivery -> Ground -> Tower -> (Tokyo/Kansai) Departure -> (Tokyo/Kobe) Control [-> Fukuoka Control above 33,500 ft]. Arrival: Fukuoka Control (high) -> Tokyo/Kobe Control (low) -> Tokyo/Kansai Approach (may include radar/final sectors) -> Tower -> Ground.", "source": "Structure inferred from the ACC split (Wikipedia) and JCAB phraseology; not a single verified source"},
+    {"situation": "Callsign notes", "example": "Airline telephony as in Japanese practice: 'All Nippon', 'Japanair', 'Air Do', 'Skymark', 'J-Air', 'Jai Ocean', 'Nippon Cargo'. Private aircraft use registration 'JA201R'. 'Heavy'/'Super' suffix required for H/J wake category since the 2020 revision.", "source": "JCAB manual examples; ATCAJ R/T Meeting Vol.025"}
+  ],
+  "airspace": {
+    "classes": {
+      "value": "Class A: PCA A (特別管制空域A), en-route control areas at or above FL290, oceanic at or above 20,000 ft. Class B/C: PCA B/C (special control airspace around major airports; VFR needs ATC permission - never in PCA A, in B only if no impact on all traffic, in C only if no impact on IFR). Class D: control zones (管制圏, typically about 5 NM radius / 3,000 ft AGL). Class E: approach control areas (進入管制区), information zones and other controlled airspace. Class G: uncontrolled. TCAs (terminal control areas) provide radar advisory to VFR.",
+      "verified": false,
+      "source": "JCAB manual (PCA A/B/C VFR rules - verified); VATJPN class document and search summary (class mapping - partly verified; VATJPN says the major-airport PCAs are Class C)"
+    },
+    "kansai": {
+      "value": "Kansai Approach (radar at KIX) controls the terminal airspace that contains KIX, ITM and UKB. KIX is on the SE shore of Osaka Bay, UKB on the north shore (Kobe), ITM inland north of Osaka. KIX arrivals and departures are kept largely over Osaka Bay and Awaji Island. Since 2025 KIX traffic flies over Awaji Island (departures 5,000 ft or above, arrivals 4,000 ft or above over land). Kobe departures crossing under KIX arrivals are capped at 3,000 ft near the Akashi strait. Congestion near the Akashi strait was a key driver of the 2025 redesign. Itami arrivals come from the south over Osaka city on ILS 32L. Night (23:00-06:00) KIX traffic must use the Akashi or Kitan (Tomogashima) straits. Old STARs show gates at MAYAH (cross at 4,000 ft) via AKASI/LILAC/TOMO arrivals. Approximate approach area: roughly 40-50 NM around Osaka Bay (approximation, not verified).",
+      "verified": true,
+      "source": "Hyogo doc ; MLIT 2022 ; AIP old STAR charts (lateral extent approximate)"
+    },
+    "tokyo": {
+      "value": "Tokyo Approach/Departure (Tokyo terminal control) covers Haneda and Narita (Narita sectors use separate frequencies). Haneda flows mostly over Tokyo Bay, except the 2020 new routes over central Tokyo (south wind arrivals to 16L/16R) and the north wind RWY34R northbound departure along the Arakawa. Arrivals from the south/west via OSHIMA/AKSEL/AROSA STARs and from the north/east via GODIN/POLIX (per VATSIM STAR table). Approximate terminal area: about 50 NM around Haneda (approximation).",
+      "verified": false,
+      "source": "MLIT HND docs (routes verified); squawk.id (STAR names); lateral extent approximate"
+    },
+    "yokota": {
+      "value": "Yokota RAPCON airspace (横田進入管制区) is controlled by the US Air Force (JASDF controllers co-located since 2007). It covers airspace over 10 prefectures: Tokyo (west), Saitama, Gunma, Tochigi, Fukushima, Niigata, Nagano, Yamanashi, Shizuoka, Kanagawa. Its upper limit is stepped from about 12,000 ft up to about 23,000 ft (7,000 m). Partial returns: about 10% in 1992 and about 20% in September 2008 for Haneda capacity. IFR flights need prior permission. Effect on HND: westbound departures from Haneda first head east/south over Tokyo Bay and then climb to cross above the Yokota block (or route south around it). Arrivals from the west are funnelled south of it (via Oshima). Since 2020, part of the new HND arrival paths passes through Yokota airspace temporarily under Japanese control.",
+      "verified": true,
+      "source": "https://ja.wikipedia.org/wiki/横田空域 (extent, altitude, returns, 2020 note). HND routing effect is general knowledge (verified=false for that clause)."
+    },
+    "enrouteSplit": {"value": "Fukuoka ACC above 33,500 ft. Tokyo/Kobe ACC at or below 33,500 ft (lower).", "verified": true, "source": "ja.wikipedia 航空交通管制部"}
+  },
+  "notes": "Key gaps: (1) KIX night runway schedule and the exact post-2025 STAR/approach charts were not obtained (the AIP charts found were 2009-2012 editions). (2) The NRT north/south wind split and per-runway arr/dep preference were not found officially. (3) Tokyo ACC sector-to-area mapping after the 2025 reorganisation is not published in the sources found; former-sector links are inference. (4) Most tower/ground/approach frequencies come from enthusiast lists (Airband Japan), except the KIX ones on the AIP AD chart and the frequencies quoted in JCAB examples (Tokyo Approach 119.1, Narita Ground 121.95, Ground 121.7). (5) HND 23:00-06:00 runway use is from VATSIM Japan commentary. (6) The airspace class mapping (B vs C for PCAs) and the lateral extents of the terminal areas are approximate. (7) The 'Osaka Tower' callsign for Itami is not verified. Corrections to the original brief: Sapporo ACC no longer exists (abolished Oct 2024), and the 250 kt rule applies only in control zones and approach control areas at or below 10,000 ft. The transition altitude is 14,000 ft and the transition level is FL140 (FL150/160 when QNH is low)."
+}
